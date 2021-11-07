@@ -34,7 +34,7 @@ type Widget() =
 type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as this =
     class
         inherit Widget()
-        let generator = Blockly.python //Blockly.javascript
+        let generator = Blockly.python //Blockly.r
         ///Remove blocks from workspace without affecting variable map like blockly.getMainWorkspace().clear() would
         let clearBlocks() = 
             //NOTE: should we be using this.workspace here? What about crossing notebooks?
@@ -52,12 +52,12 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             //div to hold blockly
             let div = document.createElement ("div")
             div.setAttribute("style", "height: 480px; width: 600px;") //initial but will be immediately resized
-            div.id <- "blocklyDiv" //for debug and to refer to during injection
+            div.id <- "blocklyDivR" //for debug and to refer to during injection
             this.node.appendChild (div) |> ignore
 
             //div for buttons
             let buttonDiv =  document.createElement ("div")
-            buttonDiv.id <- "buttonDiv"
+            buttonDiv.id <- "buttonDivR"
 
             //button to trigger code generation
             let blocksToCodeButton = document.createElement ("button")
@@ -79,7 +79,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                  (fun _ ->
                      let win =
                          Browser.Dom.window.``open``
-                             ("https://github.com/aolney/fable-jupyterlab-blockly-extension/issues", "_blank")
+                             ("https://github.com/aolney/jupyterlab-blockly-r-extension/issues", "_blank")
                      win.focus()
                      ()))
             buttonDiv.appendChild( bugReportButton) |> ignore
@@ -88,10 +88,10 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             let syncCheckbox = document.createElement ("input")
             syncCheckbox.setAttribute("type", "checkbox")
             syncCheckbox?``checked`` <- true //turn on sync by default
-            syncCheckbox.id <- "syncCheckbox"
+            syncCheckbox.id <- "syncCheckboxR"
             let syncCheckboxLabel = document.createElement ("label")
             syncCheckboxLabel.innerText <- "Notebook Sync"
-            syncCheckboxLabel.setAttribute("for", "syncCheckbox")
+            syncCheckboxLabel.setAttribute("for", "syncCheckboxR")
             buttonDiv.appendChild( syncCheckbox) |> ignore
             buttonDiv.appendChild( syncCheckboxLabel) |> ignore
 
@@ -100,10 +100,10 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             // let autosaveCheckbox = document.createElement ("input")
             // autosaveCheckbox.setAttribute("type", "checkbox")
             // autosaveCheckbox?``checked`` <- false //turn off autosave by default
-            // autosaveCheckbox.id <- "autosaveCheckbox"
+            // autosaveCheckbox.id <- "autosaveCheckboxR"
             // let autosaveCheckboxLabel = document.createElement ("label")
             // autosaveCheckboxLabel.innerText <- "Autosave"
-            // autosaveCheckboxLabel.setAttribute("for", "autosaveCheckbox")
+            // autosaveCheckboxLabel.setAttribute("for", "autosaveCheckboxR")
             // buttonDiv.appendChild( autosaveCheckbox) |> ignore
             // buttonDiv.appendChild( autosaveCheckboxLabel) |> ignore
 
@@ -123,7 +123,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                 // Browser.Dom.console.log( "kernel message: " + args.header.msg_type.ToString() )
                 let messageType = args.header.msg_type.ToString()
                 if messageType = "execute_input" then
-                    Browser.Dom.console.log ("kernel executed code, updating intellisense")
+                    Browser.Dom.console.log ("R kernel executed code, updating intellisense")
                     //log executed code as string
                     Logging.LogToServer( Logging.JupyterLogEntry082720.Create "execute-code" (args.content?code |> Some) )
                     Toolbox.UpdateAllIntellisense()
@@ -141,8 +141,8 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             if args <> null then
               // console.log("I changed cells!")
               Logging.LogToServer( Logging.JupyterLogEntry082720.Create "active-cell-change" ( args.node.outerText |> Some ) ) //None )
-              let syncCheckbox = document.getElementById("syncCheckbox")
-              let autosaveCheckbox = document.getElementById("autosaveCheckbox")
+              let syncCheckbox = document.getElementById("syncCheckboxR")
+              let autosaveCheckbox = document.getElementById("autosaveCheckboxR")
               let isChecked aCheckbox : bool = (aCheckbox <> null) && aCheckbox?``checked`` |> unbox //checked is a f# reserved keyword
 
               //if sync enabled
@@ -179,7 +179,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             //set up blockly workspace
             this.workspace <-
                 blockly.inject
-                    (!^"blocklyDiv",
+                    (!^"blocklyDivR",
                      // Tricky: creatObj cannot be used here. Must use jsOptions to create POJO
                      jsOptions<Blockly.BlocklyOptions> (fun o -> o.toolbox <- !^Toolbox.toolbox |> Some)
                     // THIS FAILS!
@@ -187,7 +187,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                     //     "toolbox" ==> ~~ [ "toolbox" ==> toolbox2 ] //TODO: using toolbox2 same as using empty string here
                     // ] :?> Object
                     )
-            console.log ("blockly palette initialized")
+            console.log ("blockly R palette initialized")
 
             ///Add listeners for logging; see https://developers.google.com/blockly/guides/configure/web/events
             let logListener = System.Func<Blockly.Events.Abstract__Class,unit>(fun e ->
@@ -215,7 +215,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             )
             //check if logging should occur
             if Logging.logUrl.IsSome then 
-              console.log ("!!! Logging select blockly actions to server !!!")
+              console.log ("!!! Logging select blockly R actions to server !!!")
 
             this.workspace.removeChangeListener(logListener) |> ignore  //remove if already exists; for re-entrancy
             this.workspace.addChangeListener(logListener) |> ignore         
@@ -223,8 +223,8 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
 
         /// Resize blockly when widget resizes
         override this.onResize( msg : PhosphorWidgets.Widget.ResizeMessage ) =
-          let blocklyDiv = document.getElementById("blocklyDiv")
-          let buttonDiv = document.getElementById("buttonDiv")
+          let blocklyDiv = document.getElementById("blocklyDivR")
+          let buttonDiv = document.getElementById("buttonDivR")
           //adjust height for buttons; TODO be smarter about button height / see if we can be smarter with JupyterLab layouts
           let adjustedHeight = msg.height - 30.0 // buttonDiv.clientHeight
           //it seems we don't need parent offset; we can just use 0 
@@ -329,7 +329,7 @@ let createMainAreaWidget( bw:BlocklyWidget)=
   let w =
       JupyterlabApputils.Types.MainAreaWidget.Create
           (createObj [ "content" ==> bw ])
-  w.id <- "blockly-jupyterlab"
+  w.id <- "blockly-jupyterlab-r"
   w.title.label <- "Blockly Palette"
   w.title.closable <- true
   //
@@ -357,8 +357,8 @@ let runCommandOnNotebookChanged =
             match sender.currentWidget with
             | Some( notebook ) -> 
               // app.commands.execute(command) |> ignore
-              console.log("notebook changed, autorunning blockly command")
-              jsThis<JupyterlabApplication.JupyterFrontEnd<JupyterlabApplication.LabShell>>.commands.execute("blockly:open") |> ignore    
+              console.log("notebook changed, autorunning blockly r command")
+              jsThis<JupyterlabApplication.JupyterFrontEnd<JupyterlabApplication.LabShell>>.commands.execute("blockly_r:open") |> ignore    
             | None -> ()
             //
             true
@@ -373,7 +373,7 @@ let onKernelChanged =
       | Some(kernel) ->
           let ikernel = kernel :?> IKernel
           ikernel.iopubMessage.connect (widget.onKernelExecuted, widget ) |> ignore
-          console.log ("Listening for kernel messages")
+          console.log ("Listening for R kernel messages")
           widget.notHooked <- false
       | None -> ()
       //
@@ -400,25 +400,25 @@ let onNotebookChanged =
 /// The extension
 let extension =
     createObj
-        [ "id" ==> "jupyterlab_blockly_extension"
+        [ "id" ==> "jupyterlab_blockly_extension_r"
           "autoStart" ==> true
           "requires" ==> requires //
           //------------------------------------------------------------------------------------------------------------
           //NOTE: this **must** be wrapped in a Func, otherwise the arguments are tupled and Jupyter doesn't expect that
           //------------------------------------------------------------------------------------------------------------
           "activate" ==> System.Func<JupyterlabApplication.JupyterFrontEnd<JupyterlabApplication.LabShell>, JupyterlabApputils.ICommandPalette, JupyterlabNotebook.Tokens.INotebookTracker, JupyterlabApplication.ILayoutRestorer, unit>(fun app palette notebooks restorer ->
-                            console.log ("JupyterLab extension jupyterlab_blockly_extension is activated!")
+                            console.log ("JupyterLab extension jupyterlab_blockly_extension_r is activated!")
                             
                             //Create a blockly widget and place inside main area widget
                             let blocklyWidget = BlocklyWidget(notebooks)
                             let mutable widget = createMainAreaWidget(blocklyWidget)
 
                             //Add application command to display
-                            let command = "blockly:open"
+                            let command = "blockly_r:open"
 
                             //Set up widget tracking to restore state
-                            let tracker = JupyterlabApputils.Types.WidgetTracker.Create(!!createObj [ "namespace" ==> "blockly" ])
-                            restorer.restore(tracker, !!createObj [ "command" ==> command; "name" ==> fun () -> "blockly" ]) |> ignore
+                            let tracker = JupyterlabApputils.Types.WidgetTracker.Create(!!createObj [ "namespace" ==> "blockly_r" ])
+                            restorer.restore(tracker, !!createObj [ "command" ==> command; "name" ==> fun () -> "blockly_r" ]) |> ignore
 
                             //wait until a notebook is displayed to hook kernel messages
                             notebooks.currentChanged.connect( onNotebookChanged, blocklyWidget ) |> ignore
@@ -428,7 +428,7 @@ let extension =
                                 (command,
                                  createObj
                                       [ 
-                                        "label" ==> "Blockly Jupyterlab Extension"
+                                        "label" ==> "Blockly R"
                                         "execute" ==> fun () ->
 
                                           //Recreate the widget if the user previously closed it
@@ -454,7 +454,7 @@ let extension =
                             let searchParams = Browser.Url.URLSearchParams.Create(  Browser.Dom.window.location.search )
                             match searchParams.get("bl") with
                             | Some(state) when state = "1" ->
-                              console.log ("Blockly extension triggering open command based on query string input")
+                              console.log ("Blockly R extension triggering open command based on query string input")
                               app.restored.``then``(fun _ -> 
                                 //wait until a notebook is displayed so we dock correctly (e.g. nbgitpuller deployment)
                                 //NOTE: workspaces are stateful, so the notebook must be closed, then openned in the workspace for this to fire

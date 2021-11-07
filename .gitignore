@@ -12,3 +12,4 @@ tests/bin/
 tests/obj/
 *.ipynb
 .fake
+blockly-3.20191014.4/

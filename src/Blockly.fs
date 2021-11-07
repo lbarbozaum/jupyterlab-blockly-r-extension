@@ -10,6 +10,7 @@ open Browser.Types
 type Function = Func<string,obj>
 // type Function = Func<unit>
 
+///blockly libraries appear to be structured using UMD
 /// [<Import("*","blockly")>] appears to call index.js which calls either browser.js or node.js; 
 /// browser.js then calls core-browser, blockly, en, blocks, and javascript generator; 
 /// node.js then calls  core, blockly-node, en, blocks, and all language generators;

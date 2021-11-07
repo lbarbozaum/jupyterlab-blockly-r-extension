@@ -1,6 +1,6 @@
 # jupyterlab-blockly-r-extension
 
-This is the twin of `fable-jupyterlab-blockly-extension` but for `R` rather than `Python` (which that other repo supports).
+This is the twin of [fable-jupyterlab-blockly-extension](https://github.com/aolney/fable-jupyterlab-blockly-extension) but for `R` rather than `Python` (which that other repo supports).
 
 A [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/) extension implementing a Blockly palette with [Fable](https://fable.io/) tooling.
 
@@ -16,13 +16,13 @@ The following query string parameters enable functionality:
 ## Installation
 
 ```bash
-jupyter labextension install @aolney/fable-jupyterlab-blockly-extension
+jupyter labextension install @aolney/jupyterlab-blockly-r-extension
 ```
 
 ## Updating to latest version
 
 ```bash
-jupyter labextension update @aolney/fable-jupyterlab-blockly-extension
+jupyter labextension update @aolney/jupyterlab-blockly-r-extension
 ```
 
 ## Development

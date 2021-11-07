@@ -7,6 +7,60 @@ open Browser.Types
 open Blockly
 open JupyterlabServices.__kernel_messages.KernelMessage
 
+
+//=================================================================
+// Implement generators/r.js
+//=================================================================
+// Based on the UMD implementation in Blockly blockly-3.20191014.4,
+// it looks like we can define a language generator directly in 
+// f#
+
+// let rGenerator = blockly.GeneratorStatic.Create "R"
+// rGenerator.
+
+// blockly?R <- rGenerator
+
+    // //modeled on module r below; these should probably be pulled into their own interface to reduce duplication
+    // module R =
+    //     type [<AllowNullLiteral>] IExports =
+    //         inherit Blockly.Generator
+    //         abstract ORDER_ATOMIC: obj option
+    //         abstract ORDER_OVERRIDES: ResizeArray<ResizeArray<float>>
+    //         /// <summary>Initialise the database of variable names.</summary>
+    //         /// <param name="workspace">Workspace to generate code from.</param>
+    //         abstract init: workspace: Blockly.Workspace -> unit
+    //         abstract PASS: obj option
+    //         /// <summary>Prepend the generated code with the variable definitions.</summary>
+    //         /// <param name="code">Generated code.</param>
+    //         abstract finish: code: string -> string
+    //         /// <summary>Naked values are top-level blocks with outputs that aren't plugged into
+    //         /// anything.</summary>
+    //         /// <param name="line">Line of generated code.</param>
+    //         abstract scrubNakedValue: line: string -> string
+    //         /// <summary>Encode a string as a properly escaped R string, complete with quotes.</summary>
+    //         /// <param name="string">Text to encode.</param>
+    //         abstract quote_: string: string -> string
+    //         /// <summary>Encode a string as a properly escaped multiline R string, complete
+    //         /// with quotes.</summary>
+    //         /// <param name="string">Text to encode.</param>
+    //         abstract multiline_quote_: string: string -> string
+    //         /// <summary>Common tasks for generating R from blocks.
+    //         /// Handles comments for the specified block and any connected value blocks.
+    //         /// Calls any statements following this block.</summary>
+    //         /// <param name="block">The current block.</param>
+    //         /// <param name="code">The R code created for this block.</param>
+    //         /// <param name="opt_thisOnly">True to generate code for only this statement.</param>
+    //         abstract scrub_: block: Blockly.Block * code: string * ?opt_thisOnly: bool -> string
+    //         /// <summary>Gets a property and adjusts the value, taking into account indexing, and
+    //         /// casts to an integer.</summary>
+    //         /// <param name="block">The block.</param>
+    //         /// <param name="atId">The property ID of the element to get.</param>
+    //         /// <param name="opt_delta">Value to add.</param>
+    //         /// <param name="opt_negate">Whether to negate the value.</param>
+    //         abstract getAdjustedInt: block: Blockly.Block * atId: string * ?opt_delta: float * ?opt_negate: bool -> U2<string, float>
+
+
+//=================================================================
 //TODO: 
 // - make "read file" have shadow text block rather than input field
 // - on list comprehension, have a "when" to add filtering conditions
@@ -47,26 +101,26 @@ let thisObj : obj = jsNative
 // [<Emit("delete $0")>]
 // let delete (o : obj) : unit = jsNative
 
-[<Emit("delete blockly.Python.definitions_")>]
+[<Emit("delete blockly.R.definitions_")>]
 let deleteDefinitions : unit = jsNative
 
-[<Emit("delete blockly.Python.functionNames_")>]
+[<Emit("delete blockly.R.functionNames_")>]
 let deleteFunctions : unit = jsNative
 
 //Prevent Blockly from prepending variable definitions for us 
 // 'id' is too heavy handed - we want imports but not definitions
-// blockly?Python?finish <- id
+// blockly?R?finish <- id
 // This allows imports but not definitions //TODO: code gen for functions seems to be broken, maybe here?
-blockly?Python?finish <- System.Func<string,string>(fun code ->
+blockly?R?finish <- System.Func<string,string>(fun code ->
   let imports = ResizeArray<string>()
-  for name in JS.Constructors.Object.keys( blockly?Python?definitions_ ) do
-    let ( definitions : obj ) =  blockly?Python?definitions_
+  for name in JS.Constructors.Object.keys( blockly?R?definitions_ ) do
+    let ( definitions : obj ) =  blockly?R?definitions_
     let (def : string) = definitions.[ name ] |> string
     if def.Contains("import") then
       imports.Add(def)
   deleteDefinitions
   deleteFunctions
-  blockly?Python?variableDB_?reset()
+  blockly?R?variableDB_?reset()
   (imports |> String.concat "\n")  + "\n\n" + code)
 
 /// Encode the current Blockly workspace as an XML string
@@ -102,12 +156,12 @@ blockly?Blocks.["comprehensionForEach"] <- createObj [
     thisBlock.setTooltip !^("Use this to generate a sequence of elements, also known as a comprehension. Often used for list comprehensions." )
     thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions"
   ]
-blockly?Python.["comprehensionForEach"] <- fun (block : Blockly.Block) -> 
-  let var = blockly?Python?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
-  let list = blockly?Python?valueToCode( block, "LIST", blockly?Python?ORDER_ATOMIC )
-  let yieldValue = blockly?Python?valueToCode( block, "YIELD", blockly?Python?ORDER_ATOMIC )
+blockly?R.["comprehensionForEach"] <- fun (block : Blockly.Block) -> 
+  let var = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  let list = blockly?R?valueToCode( block, "LIST", blockly?R?ORDER_ATOMIC )
+  let yieldValue = blockly?R?valueToCode( block, "YIELD", blockly?R?ORDER_ATOMIC )
   let code = yieldValue + " for " + var + " in " + list
-  [| code; blockly?Python?ORDER_ATOMIC |] //TODO: COMPREHENSION PRECEDENCE IS ADDING () NESTING; SEE SCREENSHOT; TRY ORDER NONE?
+  [| code; blockly?R?ORDER_ATOMIC |] //TODO: COMPREHENSION PRECEDENCE IS ADDING () NESTING; SEE SCREENSHOT; TRY ORDER NONE?
 
 // with as block
 blockly?Blocks.["withAs"] <- createObj [
@@ -128,13 +182,13 @@ blockly?Blocks.["withAs"] <- createObj [
     thisBlock.setTooltip !^("Use this to open resources (usually file-type) in a way that automatically handles errors and disposes of them when done. May not be supported by all libraries." )
     thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/compound_stmts.html#with"
   ]
-blockly?Python.["withAs"] <- fun (block : Blockly.Block) -> 
-  let expressionCode = blockly?Python?valueToCode( block, "EXPRESSION", blockly?Python?ORDER_ATOMIC ) |> string
-  let targetCode = blockly?Python?variableDB_?getName( block.getFieldValue("TARGET").Value |> string, blockly?Variables?NAME_TYPE) |> string
-  let suiteCode = blockly?Python?statementToCode( block, "SUITE" ) //|| blockly?Python?PASS 
+blockly?R.["withAs"] <- fun (block : Blockly.Block) -> 
+  let expressionCode = blockly?R?valueToCode( block, "EXPRESSION", blockly?R?ORDER_ATOMIC ) |> string
+  let targetCode = blockly?R?variableDB_?getName( block.getFieldValue("TARGET").Value |> string, blockly?Variables?NAME_TYPE) |> string
+  let suiteCode = blockly?R?statementToCode( block, "SUITE" ) //|| blockly?R?PASS 
   let code = "with " + expressionCode + " as " + targetCode + ":\n" + suiteCode.ToString()
   code
-  //[| code; blockly?Python?ORDER_ATOMIC |] 
+  //[| code; blockly?R?ORDER_ATOMIC |] 
 
 
 // TEXT file read block
@@ -150,12 +204,12 @@ blockly?Blocks.["textFromFile"] <- createObj [
     thisBlock.setTooltip !^("Use this to read a text file. It will output a string." )
     thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/inputoutput.html"
   ]
-// Generate Python template code
-blockly?Python.["textFromFile"] <- fun (block : Blockly.Block) -> 
-  let fileName = blockly?Python?valueToCode( block, "FILENAME", blockly?Python?ORDER_ATOMIC )
+// Generate R template code
+blockly?R.["textFromFile"] <- fun (block : Blockly.Block) -> 
+  let fileName = blockly?R?valueToCode( block, "FILENAME", blockly?R?ORDER_ATOMIC )
   // let fileName = block.getFieldValue("FILENAME").Value |> string
   let code = "open(" + fileName + ",encoding='utf-8').read()"
-  [| code; blockly?Python?ORDER_FUNCTION_CALL |]
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 // GENERAL file read block
 blockly?Blocks.["readFile"] <- createObj [
@@ -169,11 +223,11 @@ blockly?Blocks.["readFile"] <- createObj [
     thisBlock.setTooltip !^("Use this to read a file. It will output a file, not a string." )
     thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/inputoutput.html"
   ]
-// Generate Python template code
-blockly?Python.["readFile"] <- fun (block : Blockly.Block) -> 
+// Generate R template code
+blockly?R.["readFile"] <- fun (block : Blockly.Block) -> 
   let fileName = block.getFieldValue("FILENAME").Value |> string
   let code = "open('" + fileName + "',encoding='utf-8')"
-  [| code; blockly?Python?ORDER_FUNCTION_CALL |]
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 
 /// A template to create arbitrary code blocks (FREESTYLE) in these dimensions: dummy/input; output/nooutput
@@ -190,20 +244,20 @@ let makeCodeBlock (blockName:string) (hasInput: bool) (hasOutput: bool) =
         thisBlock.setNextStatement true
         thisBlock.setPreviousStatement true
       thisBlock.setColour(!^230.0)
-      thisBlock.setTooltip !^("You can put any Python code in this block. Use this block if you " + (if hasInput then "do" else "don't") + " need to connect an input block and "+ (if hasOutput then "do" else "don't") + " need to connect an output block." )
+      thisBlock.setTooltip !^("You can put any R code in this block. Use this block if you " + (if hasInput then "do" else "don't") + " need to connect an input block and "+ (if hasOutput then "do" else "don't") + " need to connect an output block." )
       thisBlock.setHelpUrl !^"https://docs.python.org/3/"
     ]
-  // Generate Python template code
-  blockly?Python.[blockName] <- fun (block : Blockly.Block) -> 
+  // Generate R template code
+  blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
     let userCode = block.getFieldValue("CODE").Value |> string
     let code =
       if hasInput then
-        let input = blockly?Python?valueToCode( block, "INPUT", blockly?Python?ORDER_ATOMIC )
+        let input = blockly?R?valueToCode( block, "INPUT", blockly?R?ORDER_ATOMIC )
         (userCode + " " + input).Trim()
       else 
         userCode.Trim()
     if hasOutput then
-      [| code; blockly?Python?ORDER_ATOMIC |] //Assumption is that freestyle should not invoke operator precedence at all
+      [| code; blockly?R?ORDER_ATOMIC |] //Assumption is that freestyle should not invoke operator precedence at all
     else
       code + "\n" |> unbox
 
@@ -213,7 +267,7 @@ makeCodeBlock "dummyNoOutputCodeBlock" false false
 makeCodeBlock "valueOutputCodeBlock" true true
 makeCodeBlock "valueNoOutputCodeBlock" true false
 
-/// Create a Blockly/Python templated import block: TODO if we make this part of the variable menu, then users will never need to rename variable after using the block
+/// Create a Blockly/R templated import block: TODO if we make this part of the variable menu, then users will never need to rename variable after using the block
 let makeImportBlock (blockName:string) (labelOne:string) (labelTwo:string)  =
   blockly?Blocks.[ blockName ] <- createObj [
     "init" ==> fun () -> 
@@ -229,10 +283,10 @@ let makeImportBlock (blockName:string) (labelOne:string) (labelTwo:string)  =
       thisBlock.setTooltip !^"Import a python package to access functions in that package"
       thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/import.html"
     ]
-  /// Generate Python import code
-  blockly?Python.[ blockName ] <- fun (block : Blockly.Block) -> 
+  /// Generate R import code
+  blockly?R.[ blockName ] <- fun (block : Blockly.Block) -> 
     let libraryName = block.getFieldValue("libraryName").Value |> string
-    let libraryAlias = blockly?Python?variableDB_?getName( block.getFieldValue("libraryAlias").Value |> string, blockly?Variables?NAME_TYPE);
+    let libraryAlias = blockly?R?variableDB_?getName( block.getFieldValue("libraryAlias").Value |> string, blockly?Variables?NAME_TYPE);
     let code =  labelOne + " " + libraryName + " " + labelTwo + " " + libraryAlias + "\n"
     code
 
@@ -256,12 +310,12 @@ blockly?Blocks.[ "indexer" ] <- createObj [
     thisBlock.setTooltip !^"Gets an item from the variable at a given index. Not supported for all variables."
     thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/datamodel.html#object.__getitem__"
   ]
-/// Generate Python import code
-blockly?Python.[ "indexer" ] <- fun (block : Blockly.Block) -> 
-  let varName = blockly?Python?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
-  let input = blockly?Python?valueToCode( block, "INDEX", blockly?Python?ORDER_ATOMIC )
+/// Generate R import code
+blockly?R.[ "indexer" ] <- fun (block : Blockly.Block) -> 
+  let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  let input = blockly?R?valueToCode( block, "INDEX", blockly?R?ORDER_ATOMIC )
   let code =  varName + "[" + input + "]" //+ "\n"
-  [| code; blockly?Python?ORDER_ATOMIC |]
+  [| code; blockly?R?ORDER_ATOMIC |]
 
 
 /// A template for variable argument function block creation (where arguments are in a list), including the code generator.
@@ -278,14 +332,14 @@ let makeFunctionBlock (blockName:string) (label:string) (outputType:string) (too
       thisBlock.setTooltip !^tooltip
       thisBlock.setHelpUrl !^helpurl
     ]
-  /// Generate Python template conversion code
-  blockly?Python.[blockName] <- fun (block : Blockly.Block) -> 
-    // let x = blockly?Python?valueToCode( block, "x", blockly?Python?ORDER_ATOMIC )
+  /// Generate R template conversion code
+  blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
+    // let x = blockly?R?valueToCode( block, "x", blockly?R?ORDER_ATOMIC )
     // let code =  functionStr + "(" + x + ")"
-    let (args : string) = blockly?Python?valueToCode(block, "x", blockly?Python?ORDER_MEMBER) 
+    let (args : string) = blockly?R?valueToCode(block, "x", blockly?R?ORDER_MEMBER) 
     let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
     let code = functionStr + "(" +  cleanArgs + ")" 
-    [| code; blockly?Python?ORDER_FUNCTION_CALL |]
+    [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 // ALREADY EXISTS
 // sort: TODO only accept lists, setCheck("Array")
@@ -411,12 +465,12 @@ blockly?Blocks.["tupleBlock"] <- createObj [
     thisBlock.setHelpUrl(!^"https://docs.python.org/3/tutorial/datastructures.html#tuples-and-sequences");
 ]
 
-/// Generate Python for tuple
-blockly?Python.["tupleBlock"] <- fun (block : Blockly.Block) -> 
-  let firstArg = blockly?Python?valueToCode(block, "FIRST", blockly?Python?ORDER_ATOMIC) 
-  let secondArg = blockly?Python?valueToCode(block, "SECOND", blockly?Python?ORDER_ATOMIC) 
+/// Generate R for tuple
+blockly?R.["tupleBlock"] <- fun (block : Blockly.Block) -> 
+  let firstArg = blockly?R?valueToCode(block, "FIRST", blockly?R?ORDER_ATOMIC) 
+  let secondArg = blockly?R?valueToCode(block, "SECOND", blockly?R?ORDER_ATOMIC) 
   let code = "(" +  firstArg + "," + secondArg + ")" 
-  [| code; blockly?Python?ORDER_NONE |]
+  [| code; blockly?R?ORDER_NONE |]
 
 //TODO: 
 // ? OPTION FOR BOTH POSITION ONLY (PASS IN LIST OF ARGS) AND KEYWORD ARGUMENTS (PASS IN DICTIONARY)
@@ -888,23 +942,23 @@ let makeMemberIntellisenseBlock (blockName:string) (preposition:string) (verb:st
         // Blockly.blockSvg.
         ()
     ]
-  /// Generate Python intellisense member block conversion code
-  blockly?Python.[blockName] <- fun (block : Blockly.Block) -> 
-    let varName = blockly?Python?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  /// Generate R intellisense member block conversion code
+  blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
+    let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
     let memberName = block.getFieldValue("MEMBER").Value |> string
-    // let x = blockly?Python?valueToCode( block, "VAR", blockly?Python?ORDER_ATOMIC )
+    // let x = blockly?R?valueToCode( block, "VAR", blockly?R?ORDER_ATOMIC )
     let code =  
       //All of the "not defined" option messages start with "!"
       if memberName.StartsWith("!") then
         ""
       else if hasArgs then
-        let (args : string) = blockly?Python?valueToCode(block, "INPUT", blockly?Python?ORDER_MEMBER) 
+        let (args : string) = blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER) 
         let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
         varName + (if hasDot then "." else "" ) + memberName + "(" +  cleanArgs + ")" 
         // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
       else
         varName + (if hasDot then "." else "" ) + memberName
-    [| code; blockly?Python?ORDER_FUNCTION_CALL |]
+    [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 //Intellisense variable get property block
 makeMemberIntellisenseBlock 
