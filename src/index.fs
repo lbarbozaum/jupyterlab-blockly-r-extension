@@ -34,7 +34,7 @@ type Widget() =
 type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as this =
     class
         inherit Widget()
-        let generator = Blockly.python //Blockly.r
+        let generator = blockly?R //Blockly.python
         ///Remove blocks from workspace without affecting variable map like blockly.getMainWorkspace().clear() would
         let clearBlocks() = 
             //NOTE: should we be using this.workspace here? What about crossing notebooks?
@@ -47,7 +47,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             notebooks.activeCellChanged.connect( this.onActiveCellChanged, this ) |> ignore
 
             //inject intellisense dependency into Blockly toolbox
-            Toolbox.notebooks <- notebooks
+            // Toolbox.notebooks <- notebooks //AO TODO Toolbox debug
 
             //div to hold blockly
             let div = document.createElement ("div")
@@ -126,7 +126,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                     Browser.Dom.console.log ("R kernel executed code, updating intellisense")
                     //log executed code as string
                     Logging.LogToServer( Logging.JupyterLogEntry082720.Create "execute-code" (args.content?code |> Some) )
-                    Toolbox.UpdateAllIntellisense()
+                    // Toolbox.UpdateAllIntellisense() //AO TODO Toolbox debug
                 //also hook errors here; log entire error object as json
                 //else if messageType = "execute_reply" && args.content?status="error" then //would require subscribing to shell channel
                 else if messageType = "error" then
@@ -158,7 +158,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                 else
                   this.RenderBlocks()
                 //Update intellisense on blocks we just created
-                Toolbox.UpdateAllIntellisense()
+                // Toolbox.UpdateAllIntellisense() //AO TODO Toolbox debug
 
               // if autosave enabled, attempt to save our current blocks to the previous cell we just navigated off (to prevent losing work)
               if isChecked(autosaveCheckbox) && notebooks.activeCell <> null then
@@ -263,7 +263,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
               match xmlStringOption with
               | Some(xmlString) -> 
                     clearBlocks()
-                    Toolbox.decodeWorkspace ( xmlString )
+                    // Toolbox.decodeWorkspace ( xmlString ) //AO TODO Toolbox debug
                     // overwritten by logger callback
                     // this.blocksRendered <- true
                     Logging.LogToServer( Logging.JupyterLogEntry082720.Create "xml-to-blocks"  ( xmlString |> Some ) )
@@ -277,7 +277,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
 
         /// Render blocks to code
         member this.RenderCode() =
-          let code = generator.workspaceToCode (this.workspace)
+          let code = generator?workspaceToCode (this.workspace)
           if notebooks.activeCell <> null then
             //prevent overwriting markdown
             if notebooks.activeCell.model |> JupyterlabCells.Model.Types.isMarkdownCellModel then
@@ -290,7 +290,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
               notebooks.activeCell.model.value.text <-
                   code //overwrite
                   // notebooks.activeCell.model.value.text + code //append 
-                  + "\n#" + Toolbox.encodeWorkspace()  //workspace as comment
+                  // + "\n#" + Toolbox.encodeWorkspace()  //workspace as comment //AO TODO Toolbox debug
               console.log ("wrote to active cell:\n" + code + "\n")
               Logging.LogToServer( Logging.JupyterLogEntry082720.Create "blocks-to-code"  ( notebooks.activeCell.model.value.text |> Some) )
               this.blocksRendered <- true
@@ -299,7 +299,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
 
         /// Auto-save: Render blocks to code if we are on a code cell, we've previously saved to it, and have any blocks on the workspace
         member this.RenderCodeToLastCell() =
-          let code = generator.workspaceToCode (this.workspace)
+          let code = generator?workspaceToCode (this.workspace)
           if this.lastCell <> null then
             if this.lastCell.model <> null then
               if this.lastCell.model |> JupyterlabCells.Model.Types.isCodeCellModel then
@@ -314,7 +314,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
                     this.lastCell.model.value.text <-
                         code //overwrite
                         // notebooks.activeCell.model.value.text + code //append 
-                        + "\n#" + Toolbox.encodeWorkspace()  //workspace as comment
+                        // + "\n#" + Toolbox.encodeWorkspace()  //workspace as comment //AO TODO Toolbox debug
                     console.log ("wrote to active cell:\n" + code + "\n")
                     Logging.LogToServer( Logging.JupyterLogEntry082720.Create "blocks-to-code-autosave"  ( notebooks.activeCell.model.value.text |> Some) )
                     //clearBlocks() //let these blocks float like any other
