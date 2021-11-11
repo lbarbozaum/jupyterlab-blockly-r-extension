@@ -826,7 +826,7 @@ Blockly.R['text_getSubstring'] = function(block) {
 
 Blockly.R['text_changeCase'] = function(block) {
   // Change capitalization.
-  var operator = OPERATORS[block.getFieldValue('CASE')];
+  var operator = block.getFieldValue('CASE');
   var textOrder = operator ? Blockly.R.ORDER_MEMBER :
       Blockly.R.ORDER_NONE;
   var text = Blockly.R.valueToCode(block, 'TEXT',
@@ -843,12 +843,7 @@ Blockly.R['text_changeCase'] = function(block) {
 
 Blockly.R['text_trim'] = function(block) {
   // Trim spaces.
-  var OPERATORS = {
-    'LEFT': ".replace(/^[\\s\\xa0]+/, '')",
-    'RIGHT': ".replace(/[\\s\\xa0]+$/, '')",
-    'BOTH': '.trim()'
-  };
-  var operator = OPERATORS[block.getFieldValue('MODE')];
+  var operator = block.getFieldValue('MODE');
   var text = Blockly.R.valueToCode(block, 'TEXT',
       Blockly.R.ORDER_MEMBER) || '\"\"';
   if (operator === 'LEFT' ) {
@@ -915,5 +910,282 @@ Blockly.R['text_reverse'] = function(block) {
   return [code, Blockly.R.ORDER_MEMBER];
 };
 
+//***********************************************************************
+//math.js
+
+Blockly.R['math_number'] = function(block) {
+  // Numeric value.
+  var code = Number(block.getFieldValue('NUM'));
+  if (code == Infinity) {
+    code = 'Inf';
+  } else if (code == -Infinity) {
+    code = '-Inf';
+  } 
+  var order = code >= 0 ? Blockly.R.ORDER_ATOMIC :
+              Blockly.R.ORDER_UNARY_NEGATION;
+  return [code, order];
+};
+
+Blockly.R['math_arithmetic'] = function(block) {
+  // Basic arithmetic operators, and power.
+  var OPERATORS = {
+    'ADD': [' + ', Blockly.R.ORDER_ADDITION],
+    'MINUS': [' - ', Blockly.R.ORDER_SUBTRACTION],
+    'MULTIPLY': [' * ', Blockly.R.ORDER_MULTIPLICATION],
+    'DIVIDE': [' / ', Blockly.R.ORDER_DIVISION],
+    'POWER': [' ^ ', Blockly.R.ORDER_EXPONENTIATION]  
+  };
+  var tuple = OPERATORS[block.getFieldValue('OP')];
+  var operator = tuple[0];
+  var order = tuple[1];
+  var argument0 = Blockly.R.valueToCode(block, 'A', order) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'B', order) || '0';
+  var code;
+  code = argument0 + operator + argument1;
+  return [code, order];
+};
+
+Blockly.R['math_single'] = function(block) {
+  // Math operators with single operand.
+  var operator = block.getFieldValue('OP');
+  var code;
+  var arg;
+  if (operator == 'NEG') {
+    // Negation is a special case given its different operator precedence.
+    arg = Blockly.R.valueToCode(block, 'NUM',
+        Blockly.R.ORDER_UNARY_NEGATION) || '0';
+    code = '-' + arg;
+    return [code, Blockly.R.ORDER_UNARY_NEGATION];
+  }
+  if (operator == 'SIN' || operator == 'COS' || operator == 'TAN') {
+    arg = Blockly.R.valueToCode(block, 'NUM',
+        Blockly.R.ORDER_DIVISION) || '0';
+  } else {
+    arg = Blockly.R.valueToCode(block, 'NUM',
+        Blockly.R.ORDER_NONE) || '0';
+  }
+  // First, handle cases which generate values that don't need parentheses
+  // wrapping the code.
+  switch (operator) {
+    case 'ABS':
+      code = 'abs(' + arg + ')';
+      break;
+    case 'ROOT':
+      code = 'sqrt(' + arg + ')';
+      break;
+    case 'LN':
+      code = 'log(' + arg + ')';
+      break;
+    case 'EXP':
+      code = 'exp(' + arg + ')';
+      break;
+    case 'POW10':
+      code = '10 ** ' + arg ;
+      break;
+    case 'ROUND':
+      code = 'round(' + arg + ')';
+      break;
+    case 'ROUNDUP':
+      code = 'ceiling(' + arg + ')';
+      break;
+    case 'ROUNDDOWN':
+      code = 'floor(' + arg + ')';
+      break;
+    case 'SIN':
+      code = 'sin(' + arg +' *pi/180)';
+      break;
+    case 'COS':
+      code = 'cos(' + arg +' *pi/180)';
+      break;
+    case 'TAN':
+      code = 'tan(' + arg +' *pi/180)';
+      break;
+  }
+  if (code) {
+    return [code, Blockly.R.ORDER_FUNCTION_CALL];
+  }
+  // Second, handle cases which generate values that may need parentheses
+  // wrapping the code.
+  switch (operator) {
+    case 'LOG10':
+      code = 'log10(' + arg + ')';
+      break;
+    case 'ASIN':
+      code = 'asin(' + arg +' *pi/180)';
+      break;
+    case 'ACOS':
+      code = 'acos(' + arg +' *pi/180)';
+      break;
+    case 'ATAN':
+      code = 'atan(' + arg +' *pi/180)';
+      break;
+    default:
+      throw Error('Unknown math operator: ' + operator);
+  }
+  return [code, Blockly.R.ORDER_DIVISION];
+};
+
+Blockly.R['math_constant'] = function(block) {
+  // Constants: PI, E, the Golden Ratio, sqrt(2), 1/sqrt(2), INFINITY.
+  var CONSTANTS = {
+    'PI': ['pi', Blockly.R.ORDER_MEMBER],
+    'E': ['exp(1)', Blockly.R.ORDER_MEMBER],
+    'GOLDEN_RATIO':
+        ['(1 + sqrt(5)) / 2', Blockly.R.ORDER_DIVISION],
+    'SQRT2': ['sqrt(2)', Blockly.R.ORDER_MEMBER],
+    'SQRT1_2': ['sqrt(.5)', Blockly.R.ORDER_MEMBER],
+    'INFINITY': ['Inf', Blockly.R.ORDER_ATOMIC]
+  };
+  return CONSTANTS[block.getFieldValue('CONSTANT')];
+};
+
+Blockly.R['math_number_property'] = function(block) {
+  // Check if a number is even, odd, prime, whole, positive, or negative
+  // or if it is divisible by certain number. Returns true or false.
+  var number_to_check = Blockly.R.valueToCode(block, 'NUMBER_TO_CHECK',
+      Blockly.R.ORDER_MODULUS) || '0';
+  var dropdown_property = block.getFieldValue('PROPERTY');
+  var code;
+  if (dropdown_property == 'PRIME') {
+    code = number_to_check + ' == 2L || all(' + number_to_check + ' %% 2L:max(2,floor(sqrt(' + number_to_check + '))) != 0)' ;
+    return [code, Blockly.R.ORDER_FUNCTION_CALL];
+  }
+  switch (dropdown_property) {
+    case 'EVEN':
+      code = number_to_check + ' %% 2 == 0';
+      break;
+    case 'ODD':
+      code = number_to_check + ' %% 2 == 1';
+      break;
+    case 'WHOLE':
+      code = number_to_check + ' %% 1 == 0';
+      break;
+    case 'POSITIVE':
+      code = number_to_check + ' > 0';
+      break;
+    case 'NEGATIVE':
+      code = number_to_check + ' < 0';
+      break;
+    case 'DIVISIBLE_BY':
+      var divisor = Blockly.R.valueToCode(block, 'DIVISOR',
+          Blockly.R.ORDER_MODULUS) || '0';
+      code = number_to_check + ' %% ' + divisor + ' == 0';
+      break;
+  }
+  return [code, Blockly.R.ORDER_EQUALITY];
+};
+
+Blockly.R['math_change'] = function(block) {
+  // Add to a variable in place.
+  var argument0 = Blockly.R.valueToCode(block, 'DELTA',
+      Blockly.R.ORDER_ADDITION) || '0';
+  var varName = Blockly.R.variableDB_.getName(
+      block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+  return varName + ' = ifelse( length(' + varName + ')>0 & is.numeric(' + varName+ '),' + varName + ' + ' + argument0 + ',' + argument0 + ' )';
+};
+
+// Rounding functions have a single operand.
+Blockly.R['math_round'] = Blockly.R['math_single'];
+// Trigonometry functions have a single operand.
+Blockly.R['math_trig'] = Blockly.R['math_single'];
+
+Blockly.R['math_on_list'] = function(block) {
+  // Math functions for lists.
+  var func = block.getFieldValue('OP');
+  var list, code;
+  switch (func) {
+    case 'SUM':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_MEMBER) || 'list()';
+      code = 'sum(unlist(' + list + '))';
+      break;
+    case 'MIN':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_COMMA) || 'list()';
+      code = 'min(unlist(' + list + '))';
+      break;
+    case 'MAX':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_COMMA) || 'list()';
+      code = 'max(unlist(' + list + '))';
+      break;
+    case 'AVERAGE':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_NONE) || 'list()';
+      code = 'mean(unlist(' + list + '))';
+      break;
+    case 'MEDIAN':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_NONE) || 'list()';
+      code = 'median(unlist(' + list + '))';
+      break;
+    case 'MODE':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_NONE) || 'list()';
+      code = 'unique(unlist(' + list + '))[which.max(tabulate(match(' + list + ', unique(unlist(' + list + ')))))]';
+      break;
+    case 'STD_DEV':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_NONE) || 'list()';
+      code = 'sd(unlist(' + list + '))';
+      break;
+    case 'RANDOM':
+      list = Blockly.R.valueToCode(block, 'LIST',
+          Blockly.R.ORDER_NONE) || 'list()';
+      code = 'list[sample(1:length(' + list + '),1)]';
+      break;
+    default:
+      throw Error('Unknown operator: ' + func);
+  }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['math_modulo'] = function(block) {
+  // Remainder computation.
+  var argument0 = Blockly.R.valueToCode(block, 'DIVIDEND',
+      Blockly.R.ORDER_MODULUS) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'DIVISOR',
+      Blockly.R.ORDER_MODULUS) || '0';
+  var code = argument0 + ' %% ' + argument1;
+  return [code, Blockly.R.ORDER_MODULUS];
+};
+
+Blockly.R['math_constrain'] = function(block) {
+  // Constrain a number between two limits.
+  var argument0 = Blockly.R.valueToCode(block, 'VALUE',
+      Blockly.R.ORDER_COMMA) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'LOW',
+      Blockly.R.ORDER_COMMA) || '0';
+  var argument2 = Blockly.R.valueToCode(block, 'HIGH',
+      Blockly.R.ORDER_COMMA) || 'Inf';
+  var code = 'min(max(' + argument0 + ', ' + argument1 + '), ' +
+      argument2 + ')';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['math_random_int'] = function(block) {
+  // Random integer between [X] and [Y].
+  var argument0 = Blockly.R.valueToCode(block, 'FROM',
+      Blockly.R.ORDER_COMMA) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'TO',
+      Blockly.R.ORDER_COMMA) || '0';
+  var code = 'sample(' + argument0 + ':' + argument1 + ',1)';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['math_random_float'] = function(block) {
+  // Random fraction between 0 and 1.
+  return ['runif(1,0,1)', Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['math_atan2'] = function(block) {
+  // Arctangent of point (X, Y) in degrees from -180 to 180.
+  var argument0 = Blockly.R.valueToCode(block, 'X',
+      Blockly.R.ORDER_COMMA) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'Y',
+      Blockly.R.ORDER_COMMA) || '0';
+  return ['atan2(' + argument1 + ', ' + argument0 + ') / pi * 180',
+      Blockly.R.ORDER_DIVISION];
+};
 // AO: seems we don't want/need to export since we are hanging R off Blockly
 // export { Blockly.R }
