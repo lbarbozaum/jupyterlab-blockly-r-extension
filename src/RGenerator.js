@@ -1206,5 +1206,16 @@ Blockly.R['variables_set'] = function(block) {
       Blockly.Variables.NAME_TYPE);
   return varName + ' = ' + argument0 + '\n';
 };
+
+//***********************************************************************
+//variables_dynamic.js
+
+// AO: not sure what this does...
+// R is dynamically typed.
+Blockly.R['variables_get_dynamic'] =
+    Blockly.R['variables_get'];
+Blockly.R['variables_set_dynamic'] =
+    Blockly.R['variables_set'];
+
 // AO: seems we don't want/need to export since we are hanging R off Blockly
 // export { Blockly.R }
