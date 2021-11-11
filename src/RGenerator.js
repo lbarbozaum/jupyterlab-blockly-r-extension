@@ -572,8 +572,8 @@ Blockly.R['lists_getSublist'] = function(block) {
         throw Error('Unhandled option (lists_getSublist).');
     }
   code = list + '[' + at1 + ':' + at2 + ']';
-  return [code, Blockly.R.ORDER_FUNCTION_CALL];
   }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
 };
 
 Blockly.R['lists_sort'] = function(block) {
@@ -598,12 +598,12 @@ Blockly.R['lists_split'] = function(block) {
     if (!input) {
       input = '\"\"';
     }
-    var code = 'strsplit(' + input + ', ' + delimiter + ')'; //AO note delimiter is regex
+    var code = 'as.list(unlist(strsplit(' + input + ', ' + delimiter + ')))'; //AO note delimiter is regex
   } else if (mode == 'JOIN') {
     if (!input) {
       input = 'list()';
     }
-    var code = 'paste0(' + input + ',collapse="' + delimiter + '")';
+    var code = 'paste0(' + input + ',collapse=' + delimiter + ')';
   } else {
     throw Error('Unknown mode: ' + mode);
   }
@@ -720,7 +720,7 @@ Blockly.R['text_indexOf'] = function(block) {
   } else {
     var reverseText = 'paste(rev(strsplit(' + text + ', "")[[1]]),collapse="")';
     var reverseSubstring = 'paste(rev(strsplit(' + substring + ', "")[[1]]),collapse="")';
-    var code = 'nchar(' + text + ') + 1L - nchar(substring) + 1 - regexpr(' + reverseSubstring + ', ' + reverseText + ')';
+    var code = 'nchar(' + text + ') + 1L - nchar(' + substring +') + 1 - regexpr(' + reverseSubstring + ', ' + reverseText + ')';
   }
   // Adjust index if using one-based indices.
   // if (block.workspace.options.oneBasedIndex) {
@@ -1186,6 +1186,25 @@ Blockly.R['math_atan2'] = function(block) {
       Blockly.R.ORDER_COMMA) || '0';
   return ['atan2(' + argument1 + ', ' + argument0 + ') / pi * 180',
       Blockly.R.ORDER_DIVISION];
+};
+
+//***********************************************************************
+//variables.js
+
+Blockly.R['variables_get'] = function(block) {
+  // Variable getter.
+  var code = Blockly.R.variableDB_.getName(block.getFieldValue('VAR'),
+      Blockly.Variables.NAME_TYPE);
+  return [code, Blockly.R.ORDER_ATOMIC];
+};
+
+Blockly.R['variables_set'] = function(block) {
+  // Variable setter.
+  var argument0 = Blockly.R.valueToCode(block, 'VALUE',
+      Blockly.R.ORDER_NONE) || '0';
+  var varName = Blockly.R.variableDB_.getName(block.getFieldValue('VAR'),
+      Blockly.Variables.NAME_TYPE);
+  return varName + ' = ' + argument0 + '\n';
 };
 // AO: seems we don't want/need to export since we are hanging R off Blockly
 // export { Blockly.R }

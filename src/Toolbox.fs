@@ -1252,6 +1252,7 @@ let toolbox =
         </value>
       </block>
     </category>
+    <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>
   </xml>"""
 // PYTHON VERSION BELOW
   //   """<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
