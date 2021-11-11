@@ -306,6 +306,7 @@ Blockly.R.scrub_ = function(block, code, opt_thisOnly) {
 
 // AO: skipping colour.js
 
+//***********************************************************************
 //lists.js
 Blockly.R.lists = {}
 
@@ -354,7 +355,7 @@ Blockly.R['lists_indexOf'] = function(block) {
   // var operator = block.getFieldValue('END') == 'FIRST' ?
   //     'indexOf' : 'lastIndexOf';
   var item = Blockly.R.valueToCode(block, 'FIND',
-      Blockly.R.ORDER_NONE) || '\'\'';
+      Blockly.R.ORDER_NONE) || '\"\"';
   var list = Blockly.R.valueToCode(block, 'VALUE',
       Blockly.R.ORDER_MEMBER) || 'list()';
   var code = ""
@@ -591,11 +592,11 @@ Blockly.R['lists_split'] = function(block) {
   var input = Blockly.R.valueToCode(block, 'INPUT',
       Blockly.R.ORDER_MEMBER);
   var delimiter = Blockly.R.valueToCode(block, 'DELIM',
-      Blockly.R.ORDER_NONE) || '\'\'';
+      Blockly.R.ORDER_NONE) || '\"\"';
   var mode = block.getFieldValue('MODE');
   if (mode == 'SPLIT') {
     if (!input) {
-      input = '\'\'';
+      input = '\"\"';
     }
     var code = 'strsplit(' + input + ', ' + delimiter + ')'; //AO note delimiter is regex
   } else if (mode == 'JOIN') {
@@ -616,6 +617,302 @@ Blockly.R['lists_reverse'] = function(block) {
       Blockly.R.ORDER_FUNCTION_CALL) || 'list';
   var code = 'rev(' + list + ')';
   return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+//***********************************************************************
+//text.js
+
+Blockly.R['text'] = function(block) {
+  // Text value.
+  var code = Blockly.R.quote_(block.getFieldValue('TEXT'));
+  return [code, Blockly.R.ORDER_ATOMIC];
+};
+
+Blockly.R['text_multiline'] = function(block) {
+  // Text value.
+  var code = Blockly.R.multiline_quote_(block.getFieldValue('TEXT'));
+  return [code, Blockly.R.ORDER_ATOMIC];
+};
+
+/**
+ * Enclose the provided value in 'String(...)' function.
+ * Leave string literals alone.
+ * @param {string} value Code evaluating to a value.
+ * @return {string} Code evaluating to a string.
+ * @private
+ */
+Blockly.R.text.forceString_ = function(value) {
+  if (Blockly.R.text.forceString_.strRegExp.test(value)) {
+    return value;
+  }
+  return 'toString(' + value + ')';
+};
+
+/**
+ * Regular expression to detect a single-quoted string literal.
+ */
+Blockly.R.text.forceString_.strRegExp = /^\s*'([^']|\\')*'\s*$/;
+
+Blockly.R['text_join'] = function(block) {
+  // Create a string made up of any number of elements of any type.
+  switch (block.itemCount_) {
+    case 0:
+      return ['\"\"', Blockly.R.ORDER_ATOMIC];
+    case 1:
+      var element = Blockly.R.valueToCode(block, 'ADD0',
+          Blockly.R.ORDER_NONE) || '\"\"';
+      var code = Blockly.R.text.forceString_(element);
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+    case 2:
+      var element0 = Blockly.R.valueToCode(block, 'ADD0',
+          Blockly.R.ORDER_NONE) || '\"\"';
+      var element1 = Blockly.R.valueToCode(block, 'ADD1',
+          Blockly.R.ORDER_NONE) || '\"\"';
+      var code = 'paste0(' + Blockly.R.text.forceString_(element0) + ', ' +
+          Blockly.R.text.forceString_(element1) + ')';
+      return [code, Blockly.R.ORDER_ADDITION];
+    default:
+      var elements = new Array(block.itemCount_);
+      for (var i = 0; i < block.itemCount_; i++) {
+        elements[i] = Blockly.R.valueToCode(block, 'ADD' + i,
+            Blockly.R.ORDER_COMMA) || '\"\"';
+      }
+      var code = 'paste0(' + elements.join(', ') + ')';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+  }
+};
+
+Blockly.R['text_append'] = function(block) {
+  // Append to a variable in place.
+  var varName = Blockly.R.variableDB_.getName(
+      block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+  var value = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  return varName + ' <- paste0(' + varName + ', ' + Blockly.R.text.forceString_(value) + ')\n';
+};
+
+Blockly.R['text_length'] = function(block) {
+  // String or array length.
+  var text = Blockly.R.valueToCode(block, 'VALUE',
+      Blockly.R.ORDER_FUNCTION_CALL) || '\"\"';
+  var code = 'nchar(' + text + ')';
+  return [code, Blockly.R.ORDER_MEMBER];
+};
+
+Blockly.R['text_isEmpty'] = function(block) {
+  // Is the string null or array empty?
+  var text = Blockly.R.valueToCode(block, 'VALUE',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  var code = '(is.na(' + text + ') || ' + text + ' == "")';
+  return [code, Blockly.R.ORDER_LOGICAL_NOT];
+};
+
+Blockly.R['text_indexOf'] = function(block) {
+  // Search the text for a substring.
+  var operator = block.getFieldValue('END') == 'FIRST' ?
+      'indexOf' : 'lastIndexOf';
+  var substring = Blockly.R.valueToCode(block, 'FIND',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  var text = Blockly.R.valueToCode(block, 'VALUE',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  if( operator === 'indexOf' ) {
+    var code = 'regexpr(' + substring + ',' + text + ')';
+  } else {
+    var reverseText = 'paste(rev(strsplit(' + text + ', "")[[1]]),collapse="")';
+    var reverseSubstring = 'paste(rev(strsplit(' + substring + ', "")[[1]]),collapse="")';
+    var code = 'nchar(' + text + ') + 1L - nchar(substring) + 1 - regexpr(' + reverseSubstring + ', ' + reverseText + ')';
+  }
+  // Adjust index if using one-based indices.
+  // if (block.workspace.options.oneBasedIndex) {
+  //   return [code + ' + 1', Blockly.R.ORDER_ADDITION];
+  // }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['text_charAt'] = function(block) {
+  // Get letter at index.
+  // Note: Until January 2013 this block did not have the WHERE input.
+  var where = block.getFieldValue('WHERE') || 'FROM_START';
+  var textOrder = (where == 'RANDOM') ? Blockly.R.ORDER_NONE :
+      Blockly.R.ORDER_MEMBER;
+  var text = Blockly.R.valueToCode(block, 'VALUE',
+      textOrder) || '\"\"';
+  switch (where) {
+    case 'FIRST':
+      var code = 'substr(' + text + ', 1, 1)';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+    case 'LAST':
+      var code = 'substr(' + text + ', nchar(' + text + '), nchar(' + text + '))';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+    case 'FROM_START':
+      var at = Blockly.R.valueToCode(block, 'AT', Blockly.R.ORDER_NONE) ||    '1';
+      var code = 'substr(' + text + ', ' + at + ',' + at + ')';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+    case 'FROM_END':
+      var at = Blockly.R.valueToCode(block, 'AT', Blockly.R.ORDER_NONE) ||    '1';
+      var code = 'substr(' + text + ', nchar(' + text + ') - ' + at + ', nchar(' + text + ') - ' + at + ')';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+    case 'RANDOM':
+      var at = 'sample(1:nchar(' + text + '),1)'
+      var code = 'substr(' + text + ', ' + at + ',' + at + ')';
+      return [code, Blockly.R.ORDER_FUNCTION_CALL];
+  }
+  throw Error('Unhandled option (text_charAt).');
+};
+
+/**
+ * Returns an expression calculating the index into a string.
+ * @param {string} stringName Name of the string, used to calculate length.
+ * @param {string} where The method of indexing, selected by dropdown in Blockly
+ * @param {string=} opt_at The optional offset when indexing from start/end.
+ * @return {string} Index expression.
+ * @private
+ */
+Blockly.R.text.getIndex_ = function(stringName, where, opt_at) {
+  if (where == 'FIRST') {
+    return '0';
+  } else if (where == 'FROM_END') {
+    return stringName + '.length - 1 - ' + opt_at;
+  } else if (where == 'LAST') {
+    return stringName + '.length - 1';
+  } else {
+    return opt_at;
+  }
+};
+
+Blockly.R['text_getSubstring'] = function(block) {
+  // Get substring.
+  var text = Blockly.R.valueToCode(block, 'STRING',
+      Blockly.R.ORDER_FUNCTION_CALL) || '\"\"';
+  var where1 = block.getFieldValue('WHERE1');
+  var where2 = block.getFieldValue('WHERE2');
+  if (where1 == 'FIRST' && where2 == 'LAST') {
+    var code = text;
+  } else {
+    // If the text is a variable or literal or doesn't require a call for
+    // length, don't generate a helper function.
+    switch (where1) {
+      case 'FROM_START':
+        var at1 = Blockly.R.valueToCode(block, 'AT1', Blockly.R.ORDER_NONE) ||    '1';
+        break;
+      case 'FROM_END':
+        var at1 = Blockly.R.valueToCode(block, 'AT1', Blockly.R.ORDER_NONE) ||    '1';
+        at1 = 'nchar(' + text + ') - ' + at1 ;
+        break;
+      case 'FIRST':
+        var at1 = '0';
+        break;
+      default:
+        throw Error('Unhandled option (text_getSubstring).');
+    }
+    switch (where2) {
+      case 'FROM_START':
+        var at2 = Blockly.R.valueToCode(block, 'AT2', Blockly.R.ORDER_NONE) ||    '1';
+        break;
+      case 'FROM_END':
+        var at2 = Blockly.R.valueToCode(block, 'AT2', Blockly.R.ORDER_NONE) ||    '1';
+        at2 = 'nchar(' + text + ') - ' + at2 ;
+        break;
+      case 'LAST':
+        var at2 = 'nchar(' + text + ')';
+        break;
+      default:
+        throw Error('Unhandled option (text_getSubstring).');
+    }
+    var code = 'substr(' + text + ', ' + at1 + ', ' + at2 + ')';
+  } 
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['text_changeCase'] = function(block) {
+  // Change capitalization.
+  var operator = OPERATORS[block.getFieldValue('CASE')];
+  var textOrder = operator ? Blockly.R.ORDER_MEMBER :
+      Blockly.R.ORDER_NONE;
+  var text = Blockly.R.valueToCode(block, 'TEXT',
+      textOrder) || '\"\"';
+  if (operator === 'UPPERCASE' ) {
+    var code = 'toupper(' + text + ')';
+  } else if (operator === 'LOWERCASE' ) {
+    var code = 'tolower(' + text + ')';
+  } else {
+    var code = 'tools::toTitleCase(' + text + ')';
+  }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['text_trim'] = function(block) {
+  // Trim spaces.
+  var OPERATORS = {
+    'LEFT': ".replace(/^[\\s\\xa0]+/, '')",
+    'RIGHT': ".replace(/[\\s\\xa0]+$/, '')",
+    'BOTH': '.trim()'
+  };
+  var operator = OPERATORS[block.getFieldValue('MODE')];
+  var text = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  if (operator === 'LEFT' ) {
+    var code = 'trimws(' + text + ', "left")';
+  } else if (operator === 'RIGHT' ) {
+    var code = 'trimws(' + text + ', "right")';
+  } else {
+    var code = 'trimws(' + text + ', "both")';
+  }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['text_print'] = function(block) {
+  // Print statement.
+  var msg = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  return 'print(' + msg + ');\n';
+};
+
+Blockly.R['text_prompt_ext'] = function(block) {
+  // Prompt function.
+  if (block.getField('TEXT')) {
+    // Internal message.
+    var msg = Blockly.R.quote_(block.getFieldValue('TEXT'));
+  } else {
+    // External message.
+    var msg = Blockly.R.valueToCode(block, 'TEXT',
+        Blockly.R.ORDER_NONE) || '\"\"';
+  }
+  var code = 'readline(' + msg + ')';
+  var toNumber = block.getFieldValue('TYPE') == 'NUMBER';
+  if (toNumber) {
+    code = 'as.numeric(' + code + ')';
+  }
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['text_prompt'] = Blockly.R['text_prompt_ext'];
+
+Blockly.R['text_count'] = function(block) {
+  var text = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  var sub = Blockly.R.valueToCode(block, 'SUB',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  var code = 'lengths(regmatches(' + text + ', gregexpr(' + sub + ', ' + text + ')))';
+  return [code, Blockly.R.ORDER_SUBTRACTION];
+};
+
+Blockly.R['text_replace'] = function(block) {
+  var text = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  var from = Blockly.R.valueToCode(block, 'FROM',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  var to = Blockly.R.valueToCode(block, 'TO',
+      Blockly.R.ORDER_NONE) || '\"\"';
+  var code = 'gsub(' + to + ',' + from + ',' + text + ',fixed=TRUE)';
+  return [code, Blockly.R.ORDER_MEMBER];
+};
+
+Blockly.R['text_reverse'] = function(block) {
+  var text = Blockly.R.valueToCode(block, 'TEXT',
+      Blockly.R.ORDER_MEMBER) || '\"\"';
+  var code = 'paste(rev(strsplit(' + text + ', "")[[1]]),collapse="")';
+  return [code, Blockly.R.ORDER_MEMBER];
 };
 
 // AO: seems we don't want/need to export since we are hanging R off Blockly
