@@ -320,7 +320,7 @@ Blockly.R['lists_create_with'] = function(block) {
   var elements = new Array(block.itemCount_);
   for (var i = 0; i < block.itemCount_; i++) {
     elements[i] = Blockly.R.valueToCode(block, 'ADD' + i,
-        Blockly.R.ORDER_COMMA) || 'NA';
+        Blockly.R.ORDER_COMMA) || 'NULL'; //AO: think NULL better than NA here
   }
   var code = 'list(' + elements.join(', ') + ')';
   return [code, Blockly.R.ORDER_ATOMIC];
@@ -329,7 +329,7 @@ Blockly.R['lists_create_with'] = function(block) {
 Blockly.R['lists_repeat'] = function(block) {
   // Create a list with one element repeated.
   var element = Blockly.R.valueToCode(block, 'ITEM',
-      Blockly.R.ORDER_COMMA) || 'NA';
+      Blockly.R.ORDER_COMMA) || 'NULL'; //AO: think NULL better than NA here
   var repeatCount = Blockly.R.valueToCode(block, 'NUM',
       Blockly.R.ORDER_COMMA) || '0';
   var code = "as.list(rep(" + element +  ', ' + repeatCount + '))';
@@ -465,7 +465,7 @@ Blockly.R['lists_setIndex'] = function(block) {
   var mode = block.getFieldValue('MODE') || 'GET';
   var where = block.getFieldValue('WHERE') || 'FROM_START';
   var value = Blockly.R.valueToCode(block, 'TO',
-      Blockly.R.ORDER_ASSIGNMENT) || 'NA';
+      Blockly.R.ORDER_ASSIGNMENT) || 'NULL'; //AO: think NULL better than NA here
 
   switch (where) {
     case ('FIRST'):
@@ -1216,6 +1216,131 @@ Blockly.R['variables_get_dynamic'] =
     Blockly.R['variables_get'];
 Blockly.R['variables_set_dynamic'] =
     Blockly.R['variables_set'];
+
+//***********************************************************************
+//logic.js
+
+Blockly.R['controls_if'] = function(block) {
+  // If/elseif/else condition.
+  var n = 0;
+  var code = '', branchCode, conditionCode;
+  if (Blockly.R.STATEMENT_PREFIX) {
+    // Automatic prefix insertion is switched off for this block.  Add manually.
+    code += Blockly.R.injectId(Blockly.R.STATEMENT_PREFIX,
+        block);
+  }
+  do {
+    conditionCode = Blockly.R.valueToCode(block, 'IF' + n,
+        Blockly.R.ORDER_NONE) || 'FALSE';
+    branchCode = Blockly.R.statementToCode(block, 'DO' + n);
+    if (Blockly.R.STATEMENT_SUFFIX) {
+      branchCode = Blockly.R.prefixLines(
+          Blockly.R.injectId(Blockly.R.STATEMENT_SUFFIX,
+          block), Blockly.R.INDENT) + branchCode;
+    }
+    code += (n > 0 ? ' else ' : '') +
+        'if (' + conditionCode + ') {\n' + branchCode + '}';
+    ++n;
+  } while (block.getInput('IF' + n));
+
+  if (block.getInput('ELSE') || Blockly.R.STATEMENT_SUFFIX) {
+    branchCode = Blockly.R.statementToCode(block, 'ELSE');
+    if (Blockly.R.STATEMENT_SUFFIX) {
+      branchCode = Blockly.R.prefixLines(
+          Blockly.R.injectId(Blockly.R.STATEMENT_SUFFIX,
+          block), Blockly.R.INDENT) + branchCode;
+    }
+    code += ' else {\n' + branchCode + '}';
+  }
+  return code + '\n';
+};
+
+Blockly.R['controls_ifelse'] = Blockly.R['controls_if'];
+
+Blockly.R['logic_compare'] = function(block) {
+  // Comparison operator.
+  var OPERATORS = {
+    'EQ': '==',
+    'NEQ': '!=',
+    'LT': '<',
+    'LTE': '<=',
+    'GT': '>',
+    'GTE': '>='
+  };
+  var operator = OPERATORS[block.getFieldValue('OP')];
+  var order = (operator == '==' || operator == '!=') ?
+      Blockly.R.ORDER_EQUALITY : Blockly.R.ORDER_RELATIONAL;
+  var argument0 = Blockly.R.valueToCode(block, 'A', order) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'B', order) || '0';
+  var code = argument0 + ' ' + operator + ' ' + argument1;
+  return [code, order];
+};
+
+Blockly.R['logic_operation'] = function(block) {
+  // Operations 'and', 'or'.
+  var operator = (block.getFieldValue('OP') == 'AND') ? '&&' : '||'; //AO: R has both & and &&; && seems appropriate here
+  var order = (operator == '&&') ? Blockly.R.ORDER_LOGICAL_AND :
+      Blockly.R.ORDER_LOGICAL_OR;
+  var argument0 = Blockly.R.valueToCode(block, 'A', order);
+  var argument1 = Blockly.R.valueToCode(block, 'B', order);
+  if (!argument0 && !argument1) {
+    // If there are no arguments, then the return value is false.
+    argument0 = 'FALSE';
+    argument1 = 'FALSE';
+  } else {
+    // Single missing arguments have no effect on the return value.
+    var defaultArgument = (operator == '&&') ? 'TRUE' : 'FALSE';
+    if (!argument0) {
+      argument0 = defaultArgument;
+    }
+    if (!argument1) {
+      argument1 = defaultArgument;
+    }
+  }
+  var code = argument0 + ' ' + operator + ' ' + argument1;
+  return [code, order];
+};
+
+Blockly.R['logic_negate'] = function(block) {
+  // Negation.
+  var order = Blockly.R.ORDER_LOGICAL_NOT;
+  var argument0 = Blockly.R.valueToCode(block, 'BOOL', order) ||
+      'TRUE';
+  var code = '!' + argument0;
+  return [code, order];
+};
+
+Blockly.R['logic_boolean'] = function(block) {
+  // Boolean values true and false.
+  var code = (block.getFieldValue('BOOL') == 'TRUE') ? 'TRUE' : 'FALSE';
+  return [code, Blockly.R.ORDER_ATOMIC];
+};
+
+Blockly.R['logic_null'] = function(block) {
+  // Null data type.
+  return ['NULL', Blockly.R.ORDER_ATOMIC];
+};
+
+Blockly.R['logic_ternary'] = function(block) {
+  // Ternary operator.
+  var value_if = Blockly.R.valueToCode(block, 'IF',
+      Blockly.R.ORDER_CONDITIONAL) || 'FALSE';
+  var value_then = Blockly.R.valueToCode(block, 'THEN',
+      Blockly.R.ORDER_CONDITIONAL) || 'NULL';
+  var value_else = Blockly.R.valueToCode(block, 'ELSE',
+      Blockly.R.ORDER_CONDITIONAL) || 'NULL';
+  var code = 'ifelse(' + value_if + ', ' + value_then + ', ' + value_else + ')'; //AO: this is vectorized ternary; other Blockly languages would not be vectorized here
+  return [code, Blockly.R.ORDER_CONDITIONAL];
+};
+
+//***********************************************************************
+//loops.js
+
+//***********************************************************************
+//procedures.js
+
+//***********************************************************************
+//colour.js
 
 // AO: seems we don't want/need to export since we are hanging R off Blockly
 // export { Blockly.R }

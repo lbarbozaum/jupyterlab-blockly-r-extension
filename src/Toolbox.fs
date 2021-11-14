@@ -1253,6 +1253,15 @@ let toolbox =
       </block>
     </category>
     <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>
+    <category name="LOGIC" colour="%{BKY_LOGIC_HUE}">
+    <block type="controls_if"></block>
+    <block type="logic_compare"></block>
+    <block type="logic_operation"></block>
+    <block type="logic_negate"></block>
+    <block type="logic_boolean"></block>
+    <block type="logic_null"></block>
+    <block type="logic_ternary"></block>
+  </category>
   </xml>"""
 // PYTHON VERSION BELOW
   //   """<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
