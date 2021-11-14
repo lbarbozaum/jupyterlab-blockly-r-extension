@@ -1292,6 +1292,8 @@ let toolbox =
       <block type="controls_forEach"></block>
       <block type="controls_flow_statements"></block>
     </category>
+    <!-- AO: functions definitions disappear after cell in which they were defined; is this why they were removed from Python version? -->
+    <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category>
   </xml>"""
 // PYTHON VERSION BELOW
   //   """<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">

@@ -1443,6 +1443,100 @@ Blockly.R['controls_flow_statements'] = function(block) {
 //***********************************************************************
 //procedures.js
 
+Blockly.R['procedures_defreturn'] = function(block) {
+  // Define a procedure with a return value.
+  var funcName = Blockly.R.variableDB_.getName(
+      block.getFieldValue('NAME'), Blockly.Procedures.NAME_TYPE);
+  var xfix1 = '';
+  if (Blockly.R.STATEMENT_PREFIX) {
+    xfix1 += Blockly.R.injectId(Blockly.R.STATEMENT_PREFIX,
+        block);
+  }
+  if (Blockly.R.STATEMENT_SUFFIX) {
+    xfix1 += Blockly.R.injectId(Blockly.R.STATEMENT_SUFFIX,
+        block);
+  }
+  if (xfix1) {
+    xfix1 = Blockly.R.prefixLines(xfix1, Blockly.R.INDENT);
+  }
+  var loopTrap = '';
+  if (Blockly.R.INFINITE_LOOP_TRAP) {
+    loopTrap = Blockly.R.prefixLines(
+        Blockly.R.injectId(Blockly.R.INFINITE_LOOP_TRAP,
+        block), Blockly.R.INDENT);
+  }
+  var branch = Blockly.R.statementToCode(block, 'STACK');
+  var returnValue = Blockly.R.valueToCode(block, 'RETURN',
+      Blockly.R.ORDER_NONE) || '';
+  var xfix2 = '';
+  if (branch && returnValue) {
+    // After executing the function body, revisit this block for the return.
+    xfix2 = xfix1;
+  }
+  if (returnValue) {
+    returnValue = Blockly.R.INDENT + 'return(' + returnValue + ')';
+  }
+  var args = [];
+  for (var i = 0; i < block.arguments_.length; i++) {
+    args[i] = Blockly.R.variableDB_.getName(block.arguments_[i],
+        Blockly.Variables.NAME_TYPE);
+  }
+  var code = funcName + ' <- function(' + args.join(', ') + ') {\n' +
+      xfix1 + loopTrap + branch + xfix2 + returnValue + '}';
+  code = Blockly.R.scrub_(block, code);
+  // Add % so as not to collide with helper functions in definitions list.
+  Blockly.R.definitions_['%' + funcName] = code;
+  return null;
+};
+
+// Defining a procedure without a return value uses the same generator as
+// a procedure with a return value.
+Blockly.R['procedures_defnoreturn'] =
+    Blockly.R['procedures_defreturn'];
+
+Blockly.R['procedures_callreturn'] = function(block) {
+  // Call a procedure with a return value.
+  var funcName = Blockly.R.variableDB_.getName(
+      block.getFieldValue('NAME'), Blockly.Procedures.NAME_TYPE);
+  var args = [];
+  for (var i = 0; i < block.arguments_.length; i++) {
+    args[i] = Blockly.R.valueToCode(block, 'ARG' + i,
+        Blockly.R.ORDER_COMMA) || 'NULL';
+  }
+  var code = funcName + '(' + args.join(', ') + ')';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['procedures_callnoreturn'] = function(block) {
+  // Call a procedure with no return value.
+  // Generated code is for a function call as a statement is the same as a
+  // function call as a value, with the addition of line ending.
+  var tuple = Blockly.R['procedures_callreturn'](block);
+  return tuple[0] + '\n';
+};
+
+Blockly.R['procedures_ifreturn'] = function(block) {
+  // Conditionally return value from a procedure.
+  var condition = Blockly.R.valueToCode(block, 'CONDITION',
+      Blockly.R.ORDER_NONE) || 'FALSE';
+  var code = 'if (' + condition + ') {\n';
+  if (Blockly.R.STATEMENT_SUFFIX) {
+    // Inject any statement suffix here since the regular one at the end
+    // will not get executed if the return is triggered.
+    code += Blockly.R.prefixLines(
+        Blockly.R.injectId(Blockly.R.STATEMENT_SUFFIX, block),
+        Blockly.R.INDENT);
+  }
+  if (block.hasReturnValue_) {
+    var value = Blockly.R.valueToCode(block, 'VALUE',
+        Blockly.R.ORDER_NONE) || 'NULL';
+    code += Blockly.R.INDENT + 'return(' + value + ')\n';
+  } else {
+    code += Blockly.R.INDENT + 'return(NULL)\n'; //AO: R returns last expression event without a return statement. If we return NULL, we *might* achieve the desired behavior
+  }
+  code += '}\n';
+  return code;
+};
 //***********************************************************************
 //colour.js
 
