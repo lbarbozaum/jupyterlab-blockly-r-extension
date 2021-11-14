@@ -1336,6 +1336,110 @@ Blockly.R['logic_ternary'] = function(block) {
 //***********************************************************************
 //loops.js
 
+Blockly.R['controls_repeat_ext'] = function(block) {
+  // Repeat n times.
+  if (block.getField('TIMES')) {
+    // Internal number.
+    var repeats = String(parseInt(block.getFieldValue('TIMES'), 10));
+  } else {
+    // External number.
+    var repeats = Blockly.R.valueToCode(block, 'TIMES',
+        Blockly.R.ORDER_NONE) || '0';
+  }
+  if (Blockly.isNumber(repeats)) {
+    repeats = parseInt(repeats, 10);
+  } else {
+    repeats = 'strtoi(' + repeats + ')';
+  }
+  var branch = Blockly.R.statementToCode(block, 'DO');
+  branch = Blockly.R.addLoopTrap(branch, block);
+  var loopVar = Blockly.R.variableDB_.getDistinctName(
+      'count', Blockly.Variables.NAME_TYPE);
+  var code = 'for (' + loopVar + ' in 1:' + repeats + ') {\n' +
+  branch + '}\n';
+  return code;
+};
+
+Blockly.R['controls_repeat'] = Blockly.R['controls_repeat_ext'];
+
+Blockly.R['controls_whileUntil'] = function(block) {
+  // Do while/until loop.
+  var until = block.getFieldValue('MODE') == 'UNTIL';
+  var argument0 = Blockly.R.valueToCode(block, 'BOOL',
+      until ? Blockly.R.ORDER_LOGICAL_NOT :
+      Blockly.R.ORDER_NONE) || 'FALSE';
+  var branch = Blockly.R.statementToCode(block, 'DO');
+  branch = Blockly.R.addLoopTrap(branch, block);
+  if (until) {
+    argument0 = '!' + argument0;
+  }
+  return 'while (' + argument0 + ') {\n' + branch + '}\n';
+};
+
+Blockly.R['controls_for'] = function(block) {
+  // For loop.
+  var variable0 = Blockly.R.variableDB_.getName(
+      block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+  var argument0 = Blockly.R.valueToCode(block, 'FROM',
+      Blockly.R.ORDER_ASSIGNMENT) || '0';
+  var argument1 = Blockly.R.valueToCode(block, 'TO',
+      Blockly.R.ORDER_ASSIGNMENT) || '0';
+  var increment = Blockly.R.valueToCode(block, 'BY',
+      Blockly.R.ORDER_ASSIGNMENT) || '1';
+  var branch = Blockly.R.statementToCode(block, 'DO');
+  branch = Blockly.R.addLoopTrap(branch, block);
+  //AO: other languages have a lot of complexity; R seems to capture up/down and non integer looping intrinsically
+  var code = 'for (' + variable0 + ' in seq(from=' + argument0 + ', to=' + argument1 + ', by=' + increment + ')) {\n' +
+  branch + '}\n';
+  return code;
+};
+
+Blockly.R['controls_forEach'] = function(block) {
+  // For each loop.
+  var variable0 = Blockly.R.variableDB_.getName(
+      block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+  var argument0 = Blockly.R.valueToCode(block, 'LIST',
+      Blockly.R.ORDER_ASSIGNMENT) || 'list()';
+  var branch = Blockly.R.statementToCode(block, 'DO');
+  branch = Blockly.R.addLoopTrap(branch, block);
+  var code = 'for (' + variable0 + ' in ' + argument0 + ') {\n' + branch + '}\n';
+  return code;
+};
+
+Blockly.R['controls_flow_statements'] = function(block) {
+  // Flow statements: continue, break.
+  var xfix = '';
+  if (Blockly.R.STATEMENT_PREFIX) {
+    // Automatic prefix insertion is switched off for this block.  Add manually.
+    xfix += Blockly.R.injectId(Blockly.R.STATEMENT_PREFIX,
+        block);
+  }
+  if (Blockly.R.STATEMENT_SUFFIX) {
+    // Inject any statement suffix here since the regular one at the end
+    // will not get executed if the break/continue is triggered.
+    xfix += Blockly.R.injectId(Blockly.R.STATEMENT_SUFFIX,
+        block);
+  }
+  if (Blockly.R.STATEMENT_PREFIX) {
+    var loop = Blockly.Constants.Loops
+        .CONTROL_FLOW_IN_LOOP_CHECK_MIXIN.getSurroundLoop(block);
+    if (loop && !loop.suppressPrefixSuffix) {
+      // Inject loop's statement prefix here since the regular one at the end
+      // of the loop will not get executed if 'continue' is triggered.
+      // In the case of 'break', a prefix is needed due to the loop's suffix.
+      xfix += Blockly.R.injectId(Blockly.R.STATEMENT_PREFIX,
+          loop);
+    }
+  }
+  switch (block.getFieldValue('FLOW')) {
+    case 'BREAK':
+      return xfix + 'break\n';
+    case 'CONTINUE':
+      return xfix + 'next\n';
+  }
+  throw Error('Unknown flow statement.');
+};
+
 //***********************************************************************
 //procedures.js
 
