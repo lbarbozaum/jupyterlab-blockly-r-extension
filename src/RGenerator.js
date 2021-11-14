@@ -1540,5 +1540,47 @@ Blockly.R['procedures_ifreturn'] = function(block) {
 //***********************************************************************
 //colour.js
 
+Blockly.R['colour_picker'] = function(block) {
+  // Colour picker.
+  var code = Blockly.R.quote_(block.getFieldValue('COLOUR'));
+  return [code, Blockly.R.ORDER_ATOMIC];
+};
+
+Blockly.R['colour_random'] = function(block) {
+  // Generate a random colour.
+  var code = 'rgb(sample(1:255,1),sample(1:255,1),sample(1:255,1),maxColorValue=255)';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['colour_rgb'] = function(block) {
+  // Compose a colour from RGB components expressed as percentages.
+  var red = Blockly.R.valueToCode(block, 'RED',
+      Blockly.R.ORDER_COMMA) || 0;
+  var green = Blockly.R.valueToCode(block, 'GREEN',
+      Blockly.R.ORDER_COMMA) || 0;
+  var blue = Blockly.R.valueToCode(block, 'BLUE',
+      Blockly.R.ORDER_COMMA) || 0;
+  var code = 'rgb(' + red + ', ' + green + ', ' + blue + ',maxColorValue=255)';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
+Blockly.R['colour_blend'] = function(block) {
+  // Blend two colours together.
+  var c1 = Blockly.R.valueToCode(block, 'COLOUR1',
+      Blockly.R.ORDER_COMMA) || '\'#000000\'';
+  var c2 = Blockly.R.valueToCode(block, 'COLOUR2',
+      Blockly.R.ORDER_COMMA) || '\'#000000\'';
+  var ratio = Blockly.R.valueToCode(block, 'RATIO',
+      Blockly.R.ORDER_COMMA) || 0.5;
+  //AO: this could reasonably be a function, but avoiding that because of current function handling issues
+  var code = 'c1 <- col2rgb(' + c1 + ')\n' +
+            'c2 <- col2rgb(' + c2 + ')\n' +
+            'r <- sqrt((1 - ' + ratio + ') * c1[1]^2 + ' + ratio + '* c2[1]^2)\n' +
+            'g <- sqrt((1 - ' + ratio + ') * c1[2]^2 + ' + ratio + '* c2[2]^2)\n' +
+            'b <- sqrt((1 - ' + ratio + ') * c1[3]^2 + ' + ratio + '* c2[3]^2)\n' +
+            'rgb(r,g,b,maxColorValue=255)';
+  return [code, Blockly.R.ORDER_FUNCTION_CALL];
+};
+
 // AO: seems we don't want/need to export since we are hanging R off Blockly
 // export { Blockly.R }
