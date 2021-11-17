@@ -1,8 +1,8 @@
 # jupyterlab-blockly-r-extension
 
-This is the twin of [fable-jupyterlab-blockly-extension](https://github.com/aolney/fable-jupyterlab-blockly-extension) but for `R` rather than `Python` (which that other repo supports).
+A [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/) extension implementing a Blockly palette for R using [Fable](https://fable.io/) tooling.
 
-A [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/) extension implementing a Blockly palette with [Fable](https://fable.io/) tooling.
+This is the twin of [jupyterlab-blockly-python-extension](https://github.com/aolney/jupyterlab-blockly-python-extension) but for `R` rather than `Python` (which that other repo supports). These two extensions are designed to operate side by side.
 
 The following query string parameters enable functionality:
 
@@ -10,7 +10,7 @@ The following query string parameters enable functionality:
 - `log=xxx` specifies a url for a logging endpoint (e.g. https://yourdomain.com/log)
 - `id=xxx` adds an identifier for logging
 
-**NOTE: This plugin requires jupyterlab <= 1.2.6, so if you have a higher version (e.g. 2.X) you will need to execute `conda install jupyterlab=1.2.6` or similar for `pip`**
+**NOTE: This plugin requires jupyterlab <= 1.2.6, so if you have a higher version (e.g. 2.X) you will need to execute `conda install jupyterlab=1.2.6` or similar for `pip`. The conda environment specification provided in `blockly-extensions.yml` will work as-is (e.g. `mamba env create -f blockly-extensions.yml`) or can be used as a template.**
 
 
 ## Installation

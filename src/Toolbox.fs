@@ -1288,7 +1288,6 @@ let toolbox =
           </shadow>
         </value>
       </block>
-      <block type="comprehensionForEach"></block>
       <block type="controls_forEach"></block>
       <block type="controls_flow_statements"></block>
     </category>
