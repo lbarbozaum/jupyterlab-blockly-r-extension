@@ -1,4 +1,4 @@
-module Toolbox
+module RToolbox
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -48,10 +48,6 @@ importSideEffects("./RGenerator.js")
       // this.setHelpUrl !^"https://docs.python.org/3/reference/import.html"
   //)
 
-//8888888888888888888888888888888888888888888888888888888888888888888888888888
-// DEBUG - TOGGLE COMMENT EVERYTHING BELOW BUT RELEVANT TOOLBOX
-//8888888888888888888888888888888888888888888888888888888888888888888888888888
-
 /// Emit "this" typed to Block as an interop workaround
 [<Emit("this")>]
 let thisBlock : Blockly.Block = jsNative
@@ -72,20 +68,22 @@ let deleteDefinitions : unit = jsNative
 let deleteFunctions : unit = jsNative
 
 //Prevent Blockly from prepending variable definitions for us 
-// 'id' is too heavy handed - we want imports but not definitions
-// blockly?R?finish <- id
-// This allows imports but not definitions //TODO: code gen for functions seems to be broken, maybe here?
+// This allows imports and function definitions but not variable definitions; functions are identified using the language keyword
 blockly?R?finish <- System.Func<string,string>(fun code ->
   let imports = ResizeArray<string>()
+  let functions = ResizeArray<string>()
   for name in JS.Constructors.Object.keys( blockly?R?definitions_ ) do
     let ( definitions : obj ) =  blockly?R?definitions_
     let (def : string) = definitions.[ name ] |> string
-    if def.Contains("import") then
+    if def.StartsWith("library(") then
       imports.Add(def)
+    //auto functions (functions defined for default blocks) begin with "function("; user-defined functions (created via FUNCTIONS category) begin with "#" 
+    if def.StartsWith("function(") ||  def.StartsWith("# ") then 
+      functions.Add(def)
   deleteDefinitions
   deleteFunctions
   blockly?R?variableDB_?reset()
-  (imports |> String.concat "\n")  + "\n\n" + code)
+  (imports |> String.concat "\n")  + (functions |> String.concat "\n")  + "\n\n" + code)
 
 /// Encode the current Blockly workspace as an XML string
 let encodeWorkspace() =
@@ -99,84 +97,85 @@ let decodeWorkspace( xmlText ) =
   Blockly.xml.domToWorkspace( xml, blockly.getMainWorkspace() ) |> ignore
 
 //--------------------------------------------------------------------------------------------------
-// DEFINING BLOCKS BELOW: TODO update for R
+// DEFINING BLOCKS BELOW: TODO eventually clear out blocks that don't make sense for R
 //--------------------------------------------------------------------------------------------------
 
+// AO: list comprehension does not really exist for R
 // comprehension block (goes inside list block for list comprehension)
-blockly?Blocks.["comprehensionForEach"] <- createObj [
-  "init" ==> fun () ->
-    Browser.Dom.console.log( "comprehensionForEach" + " init")
-    thisBlock.appendValueInput("LIST")
-      .setCheck(!^None)
-      .appendField( !^"for each item"  )
-      .appendField( !^(blockly.FieldVariable.Create("i") :?> Blockly.Field), "VAR"  )
-      .appendField( !^"in list"  ) |> ignore
-    thisBlock.appendValueInput("YIELD")
-      .setCheck(!^None)
-      .setAlign(blockly.ALIGN_RIGHT)
-      .appendField( !^"yield"  ) |> ignore
-    thisBlock.setOutput(true, !^None)
-    thisBlock.setColour(!^230.0)
-    thisBlock.setTooltip !^("Use this to generate a sequence of elements, also known as a comprehension. Often used for list comprehensions." )
-    thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions"
-  ]
-blockly?R.["comprehensionForEach"] <- fun (block : Blockly.Block) -> 
-  let var = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
-  let list = blockly?R?valueToCode( block, "LIST", blockly?R?ORDER_ATOMIC )
-  let yieldValue = blockly?R?valueToCode( block, "YIELD", blockly?R?ORDER_ATOMIC )
-  let code = yieldValue + " for " + var + " in " + list
-  [| code; blockly?R?ORDER_ATOMIC |] //TODO: COMPREHENSION PRECEDENCE IS ADDING () NESTING; SEE SCREENSHOT; TRY ORDER NONE?
+// blockly?Blocks.["comprehensionForEach"] <- createObj [
+//   "init" ==> fun () ->
+//     Browser.Dom.console.log( "comprehensionForEach" + " init")
+//     thisBlock.appendValueInput("LIST")
+//       .setCheck(!^None)
+//       .appendField( !^"for each item"  )
+//       .appendField( !^(blockly.FieldVariable.Create("i") :?> Blockly.Field), "VAR"  )
+//       .appendField( !^"in list"  ) |> ignore
+//     thisBlock.appendValueInput("YIELD")
+//       .setCheck(!^None)
+//       .setAlign(blockly.ALIGN_RIGHT)
+//       .appendField( !^"yield"  ) |> ignore
+//     thisBlock.setOutput(true, !^None)
+//     thisBlock.setColour(!^230.0)
+//     thisBlock.setTooltip !^("Use this to generate a sequence of elements, also known as a comprehension. Often used for list comprehensions." )
+//     thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions"
+//   ]
+// blockly?R.["comprehensionForEach"] <- fun (block : Blockly.Block) -> 
+//   let var = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+//   let list = blockly?R?valueToCode( block, "LIST", blockly?R?ORDER_ATOMIC )
+//   let yieldValue = blockly?R?valueToCode( block, "YIELD", blockly?R?ORDER_ATOMIC )
+//   let code = yieldValue + " for " + var + " in " + list
+//   [| code; blockly?R?ORDER_ATOMIC |] //TODO: COMPREHENSION PRECEDENCE IS ADDING () NESTING; SEE SCREENSHOT; TRY ORDER NONE?
 
+// AO: with/as does not really exist for R
 // with as block
-blockly?Blocks.["withAs"] <- createObj [
-  "init" ==> fun () ->
-    Browser.Dom.console.log( "withAs" + " init")
-    thisBlock.appendValueInput("EXPRESSION")
-      .setCheck(!^None)
-      .appendField( !^"with"  ) |> ignore
-    thisBlock.appendDummyInput()
-      .appendField( !^"as"  ) 
-      .appendField( !^(blockly.FieldVariable.Create("item") :?> Blockly.Field), "TARGET"  ) |> ignore
-    thisBlock.appendStatementInput("SUITE")
-      .setCheck(!^None) |> ignore
-    thisBlock.setNextStatement true
-    thisBlock.setPreviousStatement true
-    thisBlock.setInputsInline true |> ignore
-    thisBlock.setColour(!^230.0)
-    thisBlock.setTooltip !^("Use this to open resources (usually file-type) in a way that automatically handles errors and disposes of them when done. May not be supported by all libraries." )
-    thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/compound_stmts.html#with"
-  ]
-blockly?R.["withAs"] <- fun (block : Blockly.Block) -> 
-  let expressionCode = blockly?R?valueToCode( block, "EXPRESSION", blockly?R?ORDER_ATOMIC ) |> string
-  let targetCode = blockly?R?variableDB_?getName( block.getFieldValue("TARGET").Value |> string, blockly?Variables?NAME_TYPE) |> string
-  let suiteCode = blockly?R?statementToCode( block, "SUITE" ) //|| blockly?R?PASS 
-  let code = "with " + expressionCode + " as " + targetCode + ":\n" + suiteCode.ToString()
-  code
+// blockly?Blocks.["withAs"] <- createObj [
+//   "init" ==> fun () ->
+//     Browser.Dom.console.log( "withAs" + " init")
+//     thisBlock.appendValueInput("EXPRESSION")
+//       .setCheck(!^None)
+//       .appendField( !^"with"  ) |> ignore
+//     thisBlock.appendDummyInput()
+//       .appendField( !^"as"  ) 
+//       .appendField( !^(blockly.FieldVariable.Create("item") :?> Blockly.Field), "TARGET"  ) |> ignore
+//     thisBlock.appendStatementInput("SUITE")
+//       .setCheck(!^None) |> ignore
+//     thisBlock.setNextStatement true
+//     thisBlock.setPreviousStatement true
+//     thisBlock.setInputsInline true |> ignore
+//     thisBlock.setColour(!^230.0)
+//     thisBlock.setTooltip !^("Use this to open resources (usually file-type) in a way that automatically handles errors and disposes of them when done. May not be supported by all libraries." )
+//     thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/compound_stmts.html#with"
+//   ]
+// blockly?R.["withAs"] <- fun (block : Blockly.Block) -> 
+//   let expressionCode = blockly?R?valueToCode( block, "EXPRESSION", blockly?R?ORDER_ATOMIC ) |> string
+//   let targetCode = blockly?R?variableDB_?getName( block.getFieldValue("TARGET").Value |> string, blockly?Variables?NAME_TYPE) |> string
+//   let suiteCode = blockly?R?statementToCode( block, "SUITE" ) //|| blockly?R?PASS 
+//   let code = "with " + expressionCode + " as " + targetCode + ":\n" + suiteCode.ToString()
+//   code
   //[| code; blockly?R?ORDER_ATOMIC |] 
 
 
 // TEXT file read block
-blockly?Blocks.["textFromFile"] <- createObj [
+blockly?Blocks.["textFromFile_R"] <- createObj [
   "init" ==> fun () ->
-    Browser.Dom.console.log( "textFromFile" + " init")
+    Browser.Dom.console.log( "textFromFile_R" + " init")
     thisBlock.appendValueInput("FILENAME")
       .setCheck(!^"String")
       .appendField( !^"read text from file"  ) |> ignore
       // .appendField( !^(blockly.FieldTextInput.Create("type filename here...") :?> Blockly.Field), "FILENAME"  ) |> ignore
     thisBlock.setOutput(true, !^None)
     thisBlock.setColour(!^230.0)
-    thisBlock.setTooltip !^("Use this to read a text file. It will output a string." )
-    thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/inputoutput.html"
+    thisBlock.setTooltip !^("Use this to read a flat text file. It will output a string." )
+    thisBlock.setHelpUrl !^"https://stackoverflow.com/a/9069670"
   ]
 // Generate R template code
-blockly?R.["textFromFile"] <- fun (block : Blockly.Block) -> 
+blockly?R.["textFromFile_R"] <- fun (block : Blockly.Block) -> 
   let fileName = blockly?R?valueToCode( block, "FILENAME", blockly?R?ORDER_ATOMIC )
-  // let fileName = block.getFieldValue("FILENAME").Value |> string
-  let code = "open(" + fileName + ",encoding='utf-8').read()"
+  let code = "readChar(" + fileName + ", file.info(" + fileName + ")$size)"
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 // GENERAL file read block
-blockly?Blocks.["readFile"] <- createObj [
+blockly?Blocks.["readFile_R"] <- createObj [
   "init" ==> fun () ->
     Browser.Dom.console.log( "readFile" + " init")
     thisBlock.appendDummyInput()
@@ -185,17 +184,17 @@ blockly?Blocks.["readFile"] <- createObj [
     thisBlock.setOutput(true, !^None)
     thisBlock.setColour(!^230.0)
     thisBlock.setTooltip !^("Use this to read a file. It will output a file, not a string." )
-    thisBlock.setHelpUrl !^"https://docs.python.org/3/tutorial/inputoutput.html"
+    thisBlock.setHelpUrl !^"https://stat.ethz.ch/R-manual/R-devel/library/base/html/connections.html"
   ]
 // Generate R template code
-blockly?R.["readFile"] <- fun (block : Blockly.Block) -> 
+blockly?R.["readFile_R"] <- fun (block : Blockly.Block) -> 
   let fileName = block.getFieldValue("FILENAME").Value |> string
-  let code = "open('" + fileName + "',encoding='utf-8')"
+  let code = "file(" + fileName + ", 'rt')"
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 
 /// A template to create arbitrary code blocks (FREESTYLE) in these dimensions: dummy/input; output/nooutput
-let makeCodeBlock (blockName:string) (hasInput: bool) (hasOutput: bool) =
+let makeCodeBlock_R (blockName:string) (hasInput: bool) (hasOutput: bool) =
   blockly?Blocks.[blockName] <- createObj [
     "init" ==> fun () ->
       let input = if hasInput then thisBlock.appendValueInput("INPUT").setCheck(!^None) else thisBlock.appendDummyInput()
@@ -209,7 +208,7 @@ let makeCodeBlock (blockName:string) (hasInput: bool) (hasOutput: bool) =
         thisBlock.setPreviousStatement true
       thisBlock.setColour(!^230.0)
       thisBlock.setTooltip !^("You can put any R code in this block. Use this block if you " + (if hasInput then "do" else "don't") + " need to connect an input block and "+ (if hasOutput then "do" else "don't") + " need to connect an output block." )
-      thisBlock.setHelpUrl !^"https://docs.python.org/3/"
+      thisBlock.setHelpUrl !^"https://cran.r-project.org/manuals.html"
     ]
   // Generate R template code
   blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
@@ -226,42 +225,44 @@ let makeCodeBlock (blockName:string) (hasInput: bool) (hasOutput: bool) =
       code + "\n" |> unbox
 
 //Make all varieties of code block
-makeCodeBlock "dummyOutputCodeBlock" false true
-makeCodeBlock "dummyNoOutputCodeBlock" false false
-makeCodeBlock "valueOutputCodeBlock" true true
-makeCodeBlock "valueNoOutputCodeBlock" true false
+makeCodeBlock_R "dummyOutputCodeBlock_R" false true
+makeCodeBlock_R "dummyNoOutputCodeBlock_R" false false
+makeCodeBlock_R "valueOutputCodeBlock_R" true true
+makeCodeBlock_R "valueNoOutputCodeBlock_R" true false
 
-/// Create a Blockly/R templated import block: TODO if we make this part of the variable menu, then users will never need to rename variable after using the block
-let makeImportBlock (blockName:string) (labelOne:string) (labelTwo:string)  =
+/// Create a Blockly/R templated import/library block
+let makeImportBlock_R (blockName:string) (labelOne:string) = //(labelTwo:string)  =
   blockly?Blocks.[ blockName ] <- createObj [
     "init" ==> fun () -> 
       // Browser.Dom.console.log("did import block init")
       thisBlock.appendDummyInput()
         .appendField( !^labelOne  )
         .appendField( !^(blockly.FieldTextInput.Create("some library") :?> Blockly.Field), "libraryName"  )
-        .appendField( !^labelTwo)
-        .appendField( !^(blockly.FieldVariable.Create("variable name") :?> Blockly.Field), "libraryAlias"  ) |> ignore
+        // .appendField( !^labelTwo)
+        // .appendField( !^(blockly.FieldVariable.Create("variable name") :?> Blockly.Field), "libraryAlias"  ) 
+        |> ignore
       thisBlock.setNextStatement true
       thisBlock.setPreviousStatement true
       thisBlock.setColour !^230.0
-      thisBlock.setTooltip !^"Import a python package to access functions in that package"
-      thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/import.html"
+      thisBlock.setTooltip !^"Load an R package to access functions in that package"
+      thisBlock.setHelpUrl !^"https://stat.ethz.ch/R-manual/R-devel/library/base/html/library.html"
     ]
   /// Generate R import code
   blockly?R.[ blockName ] <- fun (block : Blockly.Block) -> 
     let libraryName = block.getFieldValue("libraryName").Value |> string
-    let libraryAlias = blockly?R?variableDB_?getName( block.getFieldValue("libraryAlias").Value |> string, blockly?Variables?NAME_TYPE);
-    let code =  labelOne + " " + libraryName + " " + labelTwo + " " + libraryAlias + "\n"
+    // let libraryAlias = blockly?R?variableDB_?getName( block.getFieldValue("libraryAlias").Value |> string, blockly?Variables?NAME_TYPE);
+    // let code =  labelOne + " " + libraryName + " " + labelTwo + " " + libraryAlias + "\n"
+    let code = "library(" + labelOne + ")"
     code
 
-//make import as block
-makeImportBlock "importAs" "import" "as"
+//make import block
+makeImportBlock_R "import_R" "library" //AO: note we are using R terminology here not Python terminology
 
 //make from import block
-makeImportBlock "importFrom" "from" "import"
+// makeImportBlock_R "importFrom" "from" "import"
 
 /// indexer block
-blockly?Blocks.[ "indexer" ] <- createObj [
+blockly?Blocks.[ "indexer_R" ] <- createObj [
   "init" ==> fun () -> 
     thisBlock.appendValueInput("INDEX")
       .appendField( !^(blockly.FieldVariable.Create("{dictVariable}") :?> Blockly.Field), "VAR"  )
@@ -272,10 +273,10 @@ blockly?Blocks.[ "indexer" ] <- createObj [
     thisBlock.setOutput true
     thisBlock.setColour !^230.0
     thisBlock.setTooltip !^"Gets an item from the variable at a given index. Not supported for all variables."
-    thisBlock.setHelpUrl !^"https://docs.python.org/3/reference/datamodel.html#object.__getitem__"
+    thisBlock.setHelpUrl !^"https://rpubs.com/tomhopper/brackets"
   ]
 /// Generate R import code
-blockly?R.[ "indexer" ] <- fun (block : Blockly.Block) -> 
+blockly?R.[ "indexer_R" ] <- fun (block : Blockly.Block) -> 
   let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
   let input = blockly?R?valueToCode( block, "INDEX", blockly?R?ORDER_ATOMIC )
   let code =  varName + "[" + input + "]" //+ "\n"
@@ -283,7 +284,7 @@ blockly?R.[ "indexer" ] <- fun (block : Blockly.Block) ->
 
 
 /// A template for variable argument function block creation (where arguments are in a list), including the code generator.
-let makeFunctionBlock (blockName:string) (label:string) (outputType:string) (tooltip:string) (helpurl:string) (functionStr:string) =
+let makeFunctionBlock_R (blockName:string) (label:string) (outputType:string) (tooltip:string) (helpurl:string) (functionStr:string) =
   blockly?Blocks.[blockName] <- createObj [
     "init" ==> fun () -> 
       Browser.Dom.console.log( blockName + " init")
@@ -316,16 +317,18 @@ let makeFunctionBlock (blockName:string) (label:string) (outputType:string) (too
 //   "sort"
 
 // reversed
-makeFunctionBlock 
-  "reversedBlock"
+makeFunctionBlock_R
+  "reversedBlock_R"
   "reversed"
   "None"
-  "Create a reversed iterator to reverse a list or a tuple; wrap it in a new list or tuple."
-  "https://docs.python.org/3/library/functions.html#reversed"
-  "reversed"
+  "Provides a reversed version of its argument."
+  "https://stat.ethz.ch/R-manual/R-devel/library/base/html/rev.html"
+  "rev"
+
+STOPPED HERE
 
 // tuple
-makeFunctionBlock 
+makeFunctionBlock_R 
   "tupleConstructorBlock"
   "tuple"
   "None"
@@ -589,22 +592,22 @@ let intellisenseLookup = new System.Collections.Generic.Dictionary<string,Intell
 // let nameDocMap = new System.Collections.Generic.Dictionary<string,string>()
 
 /// Determine if an entry is a function. We have separate blocks for properties and functions because only function blocks need parameters
-let isFunction( info : string ) = info.Contains("Type: function")
+let isFunction_R( info : string ) = info.Contains("Type: function")
 
 /// Determine if an entry is a class. 
-let isClass( info : string ) = info.Contains("Type: class")
+let isClass_R( info : string ) = info.Contains("Type: class")
 
 /// Request an IntellisenseVariable. If the type does not descend from object, the children will be empty.
 /// Sometimes we will create a variable but it will have no type until we make an assignment. 
 /// We might also create a variable and then change its type.
 /// So we need to check for introspections/completions repeatedly (no caching right now).
-let RequestIntellisenseVariable(block : Blockly.Block) ( parentName : string ) =
+let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string ) =
   // if not <| intellisenseLookup.ContainsKey( name ) then //No caching; see above
   // Update the intellisenseLookup asynchronously. First do an info lookup. If var is not an instance type, continue to doing tooltip lookup
   promise {
     try
       let! parentInspection = GetKernalInspection( parentName )
-      let parent = { Name=parentName;  Info=parentInspection; isFunction=isFunction(parentInspection); isClass=isClass(parentInspection) }
+      let parent = { Name=parentName;  Info=parentInspection; isFunction=isFunction_R(parentInspection); isClass=isClass_R(parentInspection) }
       // V2 store the name/docstring pair. This is always overwritten(*Updating*).
       // if not <| nameDocMap.ContainsKey( parentName ) then nameDocMap.Add(parentName,parentInspection) else nameDocMap.[parentName] <- parentInspection
 
@@ -659,7 +662,7 @@ let RequestIntellisenseVariable(block : Blockly.Block) ( parentName : string ) =
         let children = 
             Array.zip safeCompletions inspections 
             |> Array.map( fun (completion,inspection) -> 
-              {Name=completion; Info=inspection; isFunction=isFunction(inspection); isClass=isClass(inspection) }
+              {Name=completion; Info=inspection; isFunction=isFunction_R(inspection); isClass=isClass_R(inspection) }
             ) 
         let intellisenseVariable = { VariableEntry=parent; ChildEntries=children}
         // Store so we can synchronously find results later; if we have seen this var before, overwrite.
@@ -706,10 +709,10 @@ let RequestIntellisenseVariable(block : Blockly.Block) ( parentName : string ) =
 //   // At this stage the VAR field is not associated with the variable name presented to the user, e.g. "x"
 //   //We can get a list of variables by accessing the workspace. The last variable created is the last element in the list returned.
 //   let lastVar = block.workspace.getAllVariables() |> Seq.last
-let requestAndStubOptions (block : Blockly.Block) ( varName : string ) =
+let requestAndStubOptions_R (block : Blockly.Block) ( varName : string ) =
   if varName <> "" && not <| block.isInFlyout then //flyout restriction prevents triple requests for intellisense blocks in flyout
     //initiate an intellisense request asynchronously
-    varName |> RequestIntellisenseVariable block
+    varName |> RequestIntellisenseVariable_R block
   //return an option stub while we wait
   if block.isInFlyout then
     [| [| " "; " " |] |]
@@ -742,12 +745,12 @@ let getIntellisenseMemberTooltip( varName : string ) (memberName : string )=
   | false, _ -> "!Not defined until you execute code."
 
 /// Update all the blocks that use intellisense. Called after the kernel executes a cell so our intellisense in Blockly is updated.
-let UpdateAllIntellisense() =
+let UpdateAllIntellisense_R() =
   let workspace = blockly.getMainWorkspace()
-  let blocks = workspace.getBlocksByType("varGetProperty", false)
-  blocks.AddRange( workspace.getBlocksByType("varDoMethod", false) )
+  let blocks = workspace.getBlocksByType("varGetProperty_R", false)
+  blocks.AddRange( workspace.getBlocksByType("varDoMethod_R", false) )
   for b in blocks do
-    b?updateIntellisense(b,None, requestAndStubOptions b) 
+    b?updateIntellisense(b,None, requestAndStubOptions_R b) 
 
 /// Remove a field from a block safely, even if it doesn't exist
 let SafeRemoveField( block:Blockly.Block ) ( fieldName : string ) ( inputName : string )=
@@ -760,7 +763,7 @@ let SafeRemoveField( block:Blockly.Block ) ( fieldName : string ) ( inputName : 
 // TODO: CHANGE OUTPUT CONNECTOR DEPENDING ON INTELLISENSE: IF FUNCTION DOESN'T HAVE AN OUTPUT, REMOVE CONNECTOR
 /// Make a block that has an intellisense-populated member dropdown. The member type is property or method, defined by the filter function
 /// Note the "blockName" given to these is hardcoded elsewhere, e.g. the toolbox and intellisense update functions
-let makeMemberIntellisenseBlock (blockName:string) (preposition:string) (verb:string) (memberSelectionFunction: IntellisenseEntry -> bool ) ( hasArgs : bool ) ( hasDot : bool )= 
+let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:string) (memberSelectionFunction: IntellisenseEntry -> bool ) ( hasArgs : bool ) ( hasDot : bool )= 
   blockly?Blocks.[blockName] <- createObj [
 
     //Get the user-facing name of the selected variable; on creation, defaults to created name
@@ -821,7 +824,7 @@ let makeMemberIntellisenseBlock (blockName:string) (preposition:string) (verb:st
 
         //Since we are leveraging the validator, we return the selected value without modification
         newMemberSelection |> unbox)
-       ) :> Blockly.Field), "MEMBER"  ) |> ignore 
+      ) :> Blockly.Field), "MEMBER"  ) |> ignore 
 
       //back up to XML data if valide; when the deserialized XML contains data, we should never overwrite it here
       if thisBlockClosure?data = null then
@@ -851,16 +854,16 @@ let makeMemberIntellisenseBlock (blockName:string) (preposition:string) (verb:st
           // Within validator, "this" refers to FieldVariable not block.
           let (thisFieldVariable : Blockly.FieldVariable) = !!thisObj
           // update the options FieldDropdown by recreating it with the newly selected variable name
-          thisBlockClosure?updateIntellisense( thisBlockClosure, Some(newSelection), requestAndStubOptions thisBlockClosure  )
+          thisBlockClosure?updateIntellisense( thisBlockClosure, Some(newSelection), requestAndStubOptions_R thisBlockClosure  )
           //Since we are leveraging the validator, we return the selected value without modification
           newSelection |> unbox)
-         ) :?> Blockly.Field), "VAR"  )
+        ) :?> Blockly.Field), "VAR"  )
 
         .appendField( !^verb) |> ignore
         
         // Create the options FieldDropdown using "optionsGenerator" with the selected name, currently None
         // .appendField( !^(blockly.FieldDropdown.Create( thisBlock?varSelectionUserName(thisBlockClosure, None) |> requestAndStubOptions thisBlock ) :> Blockly.Field), "MEMBER"  ) |> ignore 
-      thisBlockClosure?updateIntellisense( thisBlockClosure, None, requestAndStubOptions thisBlockClosure) //adds the member fields, triggering intellisense
+      thisBlockClosure?updateIntellisense( thisBlockClosure, None, requestAndStubOptions_R thisBlockClosure) //adds the member fields, triggering intellisense
 
       if hasArgs then thisBlock.setInputsInline(true)
       thisBlock.setOutput(true)
@@ -925,8 +928,8 @@ let makeMemberIntellisenseBlock (blockName:string) (preposition:string) (verb:st
     [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 //Intellisense variable get property block
-makeMemberIntellisenseBlock 
-  "varGetProperty"
+makeMemberIntellisenseBlock_R
+  "varGetProperty_R"
   "from"
   "get"
   (fun (ie : IntellisenseEntry) -> not( ie.isFunction ))
@@ -934,8 +937,8 @@ makeMemberIntellisenseBlock
   true //has dot
 
 //Intellisense method block
-makeMemberIntellisenseBlock 
-  "varDoMethod"
+makeMemberIntellisenseBlock_R
+  "varDoMethod_R"
   "with"
   "do"
   (fun (ie : IntellisenseEntry) -> ie.isFunction )
@@ -943,8 +946,8 @@ makeMemberIntellisenseBlock
   true //has dot
 
 //Intellisense class constructor block
-makeMemberIntellisenseBlock 
-  "varCreateObject"
+makeMemberIntellisenseBlock_R 
+  "varCreateObject_R"
   "with"
   "create"
   (fun (ie : IntellisenseEntry) -> ie.isClass )
@@ -982,23 +985,23 @@ blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
       | Some(_,k) -> k.name = "ir"
       | _ -> false
     //variable property block
-    if blockly?Blocks?varGetProperty && isR then
+    if blockly?Blocks?varGetProperty_R && isR then
       let xml = Blockly.Utils.xml.createElement("block") 
-      xml.setAttribute("type", "varGetProperty")
+      xml.setAttribute("type", "varGetProperty_R")
       xml.setAttribute("gap", if blockly?Blocks?varGetProperty then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
     //variable method block
-    if blockly?Blocks?varDoMethod && isR then
+    if blockly?Blocks?varDoMethod_R && isR then
       let xml = Blockly.Utils.xml.createElement("block") 
-      xml.setAttribute("type", "varDoMethod")
+      xml.setAttribute("type", "varDoMethod_R")
       xml.setAttribute("gap", if blockly?Blocks?varDoMethod then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
     //variable create object block
-    if blockly?Blocks?varCreateObject && isR then
+    if blockly?Blocks?varCreateObject_R && isR then
       let xml = Blockly.Utils.xml.createElement("block") 
-      xml.setAttribute("type", "varCreateObject")
+      xml.setAttribute("type", "varCreateObject_R")
       xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
@@ -1029,8 +1032,9 @@ blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
 let toolbox =
     """<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
     <category name="IMPORT" colour="255">
-      <block type="importAs"></block>
-      <block type="importFrom"></block>
+      <block type="import"></block>
+      <!-- <block type="importAs"></block>
+      <block type="importFrom"></block> -->
     </category>
     <category name="FREESTYLE" colour="290">
       <block type="dummyOutputCodeBlock"></block>
