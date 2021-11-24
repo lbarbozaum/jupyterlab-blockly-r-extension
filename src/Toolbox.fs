@@ -21,9 +21,6 @@ importSideEffects("./RGenerator.js")
 
 
 //=================================================================
-//TODO: 
-// - make "read file" have shadow text block rather than input field
-// - on list comprehension, have a "when" to add filtering conditions
 
 //TODO: ask fable about using jsOptions to define functions
 //trying to define block without explicitly calling constructor as above...
@@ -177,10 +174,12 @@ blockly?R.["textFromFile_R"] <- fun (block : Blockly.Block) ->
 // GENERAL file read block
 blockly?Blocks.["readFile_R"] <- createObj [
   "init" ==> fun () ->
-    Browser.Dom.console.log( "readFile" + " init")
-    thisBlock.appendDummyInput()
+    Browser.Dom.console.log( "readFile_R" + " init")
+    thisBlock.appendValueInput("FILENAME")
+      .setCheck(!^"String")
       .appendField( !^"read file"  )
-      .appendField( !^(blockly.FieldTextInput.Create("type filename here...") :?> Blockly.Field), "FILENAME"  ) |> ignore
+      // .appendField( !^(blockly.FieldTextInput.Create("type filename here...") :?> Blockly.Field), "FILENAME"  ) 
+      |> ignore
     thisBlock.setOutput(true, !^None)
     thisBlock.setColour(!^230.0)
     thisBlock.setTooltip !^("Use this to read a file. It will output a file, not a string." )
@@ -188,7 +187,8 @@ blockly?Blocks.["readFile_R"] <- createObj [
   ]
 // Generate R template code
 blockly?R.["readFile_R"] <- fun (block : Blockly.Block) -> 
-  let fileName = block.getFieldValue("FILENAME").Value |> string
+  // let fileName = block.getFieldValue("FILENAME").Value |> string
+  let fileName = blockly?R?valueToCode( block, "FILENAME", blockly?R?ORDER_ATOMIC )
   let code = "file(" + fileName + ", 'rt')"
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
@@ -237,9 +237,10 @@ let makeImportBlock_R (blockName:string) (labelOne:string) = //(labelTwo:string)
       // Browser.Dom.console.log("did import block init")
       thisBlock.appendDummyInput()
         .appendField( !^labelOne  )
-        .appendField( !^(blockly.FieldTextInput.Create("some library") :?> Blockly.Field), "libraryName"  )
+        // .appendField( !^(blockly.FieldTextInput.Create("some library") :?> Blockly.Field), "libraryName"  )
         // .appendField( !^labelTwo)
-        // .appendField( !^(blockly.FieldVariable.Create("variable name") :?> Blockly.Field), "libraryAlias"  ) 
+        // .appendField( !^(blockly.FieldVariable.Create("variable name") :?> Blockly.Field), "libraryAlias"  )
+        .appendField( !^(blockly.FieldVariable.Create("some library") :?> Blockly.Field), "libraryName"  ) 
         |> ignore
       thisBlock.setNextStatement true
       thisBlock.setPreviousStatement true
@@ -249,10 +250,12 @@ let makeImportBlock_R (blockName:string) (labelOne:string) = //(labelTwo:string)
     ]
   /// Generate R import code
   blockly?R.[ blockName ] <- fun (block : Blockly.Block) -> 
-    let libraryName = block.getFieldValue("libraryName").Value |> string
+    // let libraryName = block.getFieldValue("libraryName").Value |> string
     // let libraryAlias = blockly?R?variableDB_?getName( block.getFieldValue("libraryAlias").Value |> string, blockly?Variables?NAME_TYPE);
     // let code =  labelOne + " " + libraryName + " " + labelTwo + " " + libraryAlias + "\n"
-    let code = "library(" + labelOne + ")"
+    //Create a var here because we will use it to call intellisense later
+    let libraryVar = blockly?R?variableDB_?getName( block.getFieldValue("libraryName").Value |> string, blockly?Variables?NAME_TYPE);
+    let code = "library(" + libraryVar + ")\n"
     code
 
 //make import block
@@ -325,119 +328,138 @@ makeFunctionBlock_R
   "https://stat.ethz.ch/R-manual/R-devel/library/base/html/rev.html"
   "rev"
 
-STOPPED HERE
-
-// tuple
-makeFunctionBlock_R 
-  "tupleConstructorBlock"
-  "tuple"
-  "None"
-  "Create a tuple from a list, e.g. ['a','b'] becomes ('a','b')"
-  "https://docs.python.org/3/library/stdtypes.html#tuple"
-  "tuple"
+// tuple //AO: Python tuple are mixed type, so the only equivalent in R is a 2 item list, making this redundant
+// makeFunctionBlock_R 
+//   "tupleConstructorBlock"
+//   "tuple"
+//   "None"
+//   "Create a tuple from a list, e.g. ['a','b'] becomes ('a','b')"
+//   "https://docs.python.org/3/library/stdtypes.html#tuple"
+//   "tuple"
 
 // dict
-makeFunctionBlock 
-  "dictBlock"
-  "dict"
-  "None"
-  "Create a dictionary from a list of tuples, e.g. [('a',1),('b',2)...]"
-  "https://docs.python.org/3/tutorial/datastructures.html#dictionaries"
-  "dict"
+// makeFunctionBlock //AO: Also doesn't make sense in R, where dicts are implemented by lists
+  // "dictBlock"
+  // "dict"
+  // "None"
+  // "Create a dictionary from a list of tuples, e.g. [('a',1),('b',2)...]"
+  // "https://docs.python.org/3/tutorial/datastructures.html#dictionaries"
+  // "dict"
 
 // zip
-makeFunctionBlock 
-  "zipBlock"
-  "zip"
-  "Array"
-  "Zip together two or more lists"
-  "https://docs.python.org/3.3/library/functions.html#zip"
-  "zip"
+// makeFunctionBlock //AO: Also doesn't make sense in R, see above
+//   "zipBlock"
+//   "zip"
+//   "Array"
+//   "Zip together two or more lists"
+//   "https://docs.python.org/3.3/library/functions.html#zip"
+//   "zip"
 
-// sorted
-makeFunctionBlock 
-  "sortedBlock"
-  "as sorted"
-  "Array"
-  "Sort lists of stuff"
-  "https://docs.python.org/3.3/library/functions.html#sorted"
-  "sorted"
+// sorted //AO: I think this is redundant with basic blocks
+// makeFunctionBlock_R
+//   "sortedBlock"
+//   "as sorted"
+//   "Array"
+//   "Sort lists of stuff"
+//   "https://docs.python.org/3.3/library/functions.html#sorted"
+//   "sorted"
 
-// set: TODO only accept lists, setCheck("Array")
-makeFunctionBlock 
-  "setBlock"
-  "set"
-  "Array"
-  "Make a set with unique members of a list."
-  "https://docs.python.org/2/library/sets.html"
-  "set"
+// set //AO: base R has no set object, just set operations; converting this concept to unique elements of a list elsewhere
+// makeFunctionBlock_R
+//   "setBlock"
+//   "set"
+//   "Array"
+//   "Get unique members of a list."
+//   "https://docs.python.org/2/library/sets.html"
+//   "set"
 
 // Conversion blocks, e.g. str()
-makeFunctionBlock 
-  "boolConversion"
+makeFunctionBlock_R
+  "boolConversion_R"
   "as bool"
   "Boolean"
   "Convert something to Boolean."
-  "https://docs.python.org/3/library/stdtypes.html#boolean-values"
-  "bool"
+  "https://stat.ethz.ch/R-manual/R-devel/library/base/html/logical.html"
+  "as.logical"
 
-makeFunctionBlock
-  "strConversion"
+makeFunctionBlock_R //AO: as.character is also possible here, but toString is more robust/flexible
+  "strConversion_R"
   "as str"
   "String"
   "Convert something to String."
-  "https://docs.python.org/3/library/stdtypes.html#str"
-  "str"
+  "https://stat.ethz.ch/R-manual/R-patched/library/base/html/toString.html"
+  "toString"
 
-makeFunctionBlock
-  "floatConversion"
+makeFunctionBlock_R
+  "floatConversion_R"
   "as float"
   "Number"
   "Convert something to Float."
-  "https://docs.python.org/3/library/functions.html#float"
-  "float"
+  "https://stat.ethz.ch/R-manual/R-devel/library/base/html/numeric.html"
+  "as.numeric"
 
-makeFunctionBlock
-  "intConversion"
+makeFunctionBlock_R
+  "intConversion_R"
   "as int"
   "Number" 
   "Convert something to Int."
-  "https://docs.python.org/3/library/functions.html#int"
-  "int"
+  "https://stat.ethz.ch/R-manual/R-devel/library/base/html/integer.html"
+  "as.integer"
 
-// Get user input, e.g. input()
-makeFunctionBlock
-  "getInput"
-  "input"
-  "String"
-  "Present the given prompt to the user and wait for their typed input response."
-  "https://docs.python.org/3/library/functions.html#input"
-  "input"
+// Get user input, e.g. input() //AO: basic blocks already have readline; Python input was added because raw_input in basic blocks DNE for 3.x
+// makeFunctionBlock
+//   "getInput"
+//   "input"
+//   "String"
+//   "Present the given prompt to the user and wait for their typed input response."
+//   "https://docs.python.org/3/library/functions.html#input"
+//   "input"
 
+//AO: no tuple concept for R; see above
 // Tuple block; TODO use mutator to make variable length
-blockly?Blocks.["tupleBlock"] <- createObj [
+// blockly?Blocks.["tupleBlock"] <- createObj [
+//   "init" ==> fun () ->
+//     thisBlock.appendValueInput("FIRST")
+//         .setCheck(!^None)
+//         .appendField(!^"(") |> ignore
+//     thisBlock.appendValueInput("SECOND")
+//         .setCheck(!^None)
+//         .appendField(!^",") |> ignore
+//     thisBlock.appendDummyInput()
+//         .appendField(!^")") |> ignore
+//     thisBlock.setInputsInline(true);
+//     thisBlock.setOutput(true, !^None);
+//     thisBlock.setColour(!^230.0);
+//     thisBlock.setTooltip(!^"Use this to create a two-element tuple");
+//     thisBlock.setHelpUrl(!^"https://docs.python.org/3/tutorial/datastructures.html#tuples-and-sequences");
+// ]
+
+// /// Generate R for tuple
+// blockly?R.["tupleBlock"] <- fun (block : Blockly.Block) -> 
+//   let firstArg = blockly?R?valueToCode(block, "FIRST", blockly?R?ORDER_ATOMIC) 
+//   let secondArg = blockly?R?valueToCode(block, "SECOND", blockly?R?ORDER_ATOMIC) 
+//   let code = "(" +  firstArg + "," + secondArg + ")" 
+//   [| code; blockly?R?ORDER_NONE |]
+
+// Unique elements of a list, conceptually replaces set for Python 
+blockly?Blocks.["uniqueBlock_R"] <- createObj [
   "init" ==> fun () ->
-    thisBlock.appendValueInput("FIRST")
-        .setCheck(!^None)
-        .appendField(!^"(") |> ignore
-    thisBlock.appendValueInput("SECOND")
-        .setCheck(!^None)
-        .appendField(!^",") |> ignore
-    thisBlock.appendDummyInput()
-        .appendField(!^")") |> ignore
+    thisBlock.appendValueInput("LIST")
+        .setCheck(!^"Array")
+        .appendField(!^"unique") |> ignore
     thisBlock.setInputsInline(true);
-    thisBlock.setOutput(true, !^None);
+    thisBlock.setOutput(true, !^"Array");
     thisBlock.setColour(!^230.0);
-    thisBlock.setTooltip(!^"Use this to create a two-element tuple");
-    thisBlock.setHelpUrl(!^"https://docs.python.org/3/tutorial/datastructures.html#tuples-and-sequences");
+    thisBlock.setTooltip(!^"Use this to get the unique elements of a list");
+    thisBlock.setHelpUrl(!^"https://stackoverflow.com/questions/3879522/finding-unique-values-from-a-list");
 ]
 
-/// Generate R for tuple
-blockly?R.["tupleBlock"] <- fun (block : Blockly.Block) -> 
-  let firstArg = blockly?R?valueToCode(block, "FIRST", blockly?R?ORDER_ATOMIC) 
-  let secondArg = blockly?R?valueToCode(block, "SECOND", blockly?R?ORDER_ATOMIC) 
-  let code = "(" +  firstArg + "," + secondArg + ")" 
-  [| code; blockly?R?ORDER_NONE |]
+/// Generate R for unique
+blockly?R.["uniqueBlock_R"] <- fun (block : Blockly.Block) -> 
+  let (args : string) = blockly?R?valueToCode(block, "LIST", blockly?R?ORDER_MEMBER) 
+  let code = "unique(unlist(" + args + ", use.names = FALSE))" 
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
+
 
 //TODO: 
 // ? OPTION FOR BOTH POSITION ONLY (PASS IN LIST OF ARGS) AND KEYWORD ARGUMENTS (PASS IN DICTIONARY)
@@ -954,9 +976,44 @@ makeMemberIntellisenseBlock_R
   true //has arguments
   true //no dot
 
-// Override the dynamic 'Variables' toolbox category initialized in blockly_compressed.js
+  // Override the dynamic 'Variables' toolbox category initialized in blockly_compressed.js
 // The basic idea here is that as we add vars, we extend the list of vars in the dropdowns in this category
+// NOTE: this gets a little awkward for side by side blockly extensions for different languages, since they both
+// want to overwrite a global function. Instead we let each plugin register a function called when the kernel matches some value
+///This type is shared across extentions so must match everywhere
+type FlyoutRegistryEntry =
+  {
+    ///The name of the language, e.g. Python
+    LanguageName : string
+    ///A function that verifies whether the active kernel matches our language
+    KernelCheckFunction : string -> bool
+    ///A function the implements the flyout categories
+    FlyoutFunction : Blockly.Workspace -> ResizeArray<Element>
+  }
+///This function is shared across extentions so must match everywhere
 blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
+  //check that we have registered a function
+  if blockly?Variables?flyoutRegistry <> null then
+    //get the registry
+    let registry : ResizeArray<FlyoutRegistryEntry> = unbox <| blockly?Variables?flyoutRegistry
+    //get the active kernel
+    match GetKernel() with
+    //If we have an active kernel, find the first match in our KernelCheckFunctions
+    | Some(_,k) -> 
+      let entryOption = registry |> Seq.tryFind( fun e -> e.KernelCheckFunction k.name)
+      match entryOption with
+      //we have a match, route the workspace to the flyout function for this entry
+      | Some(e) -> e.FlyoutFunction(workspace)
+      //no matching entry, return empty
+      | _ -> ResizeArray<Element>()
+    //no kernel, return empty
+    | _ -> ResizeArray<Element>()
+  //no registry, return empty
+  else
+    ResizeArray<Element>()
+
+
+let flyoutCategoryBlocks_R = fun (workspace : Blockly.Workspace) ->
   let variableModelList = workspace.getVariablesOfType("")
   let xmlList = ResizeArray<Element>()
   //Only create variable blocks if a variable has been defined
@@ -979,27 +1036,27 @@ blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
       xml.appendChild(shadowBlockDom) |> ignore
       xmlList.Add(xml)
 
-    //switch intellisense blocks in category depending on current kernel
-    let isR= 
-      match GetKernel() with
-      | Some(_,k) -> k.name = "ir"
-      | _ -> false
+    // //switch intellisense blocks in category depending on current kernel
+    // let isR= 
+    //   match GetKernel() with
+    //   | Some(_,k) -> k.name = "ir"
+    //   | _ -> false
     //variable property block
-    if blockly?Blocks?varGetProperty_R && isR then
+    if blockly?Blocks?varGetProperty_R then //&& isR then
       let xml = Blockly.Utils.xml.createElement("block") 
       xml.setAttribute("type", "varGetProperty_R")
       xml.setAttribute("gap", if blockly?Blocks?varGetProperty then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
     //variable method block
-    if blockly?Blocks?varDoMethod_R && isR then
+    if blockly?Blocks?varDoMethod_R then //&& isR then
       let xml = Blockly.Utils.xml.createElement("block") 
       xml.setAttribute("type", "varDoMethod_R")
       xml.setAttribute("gap", if blockly?Blocks?varDoMethod then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
     //variable create object block
-    if blockly?Blocks?varCreateObject_R && isR then
+    if blockly?Blocks?varCreateObject_R then //&& isR then
       let xml = Blockly.Utils.xml.createElement("block") 
       xml.setAttribute("type", "varCreateObject_R")
       xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
@@ -1025,6 +1082,97 @@ blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
         xmlList.Add(xml)
   xmlList
 
+//create or get the flyout registry
+let registry : ResizeArray<FlyoutRegistryEntry> = 
+  if blockly?Variables?flyoutRegistry = null then
+    ResizeArray<FlyoutRegistryEntry>()
+  else
+    unbox <| blockly?Variables?flyoutRegistry
+
+// register the flyout function
+registry.Add(
+    {
+      LanguageName = "R"
+      KernelCheckFunction = fun (name:string)-> name = "ir"
+      FlyoutFunction = flyoutCategoryBlocks_R
+    }
+  )
+
+//update the registry
+blockly?Variables?flyoutRegistry <- registry
+
+
+// Override the dynamic 'Variables' toolbox category initialized in blockly_compressed.js
+// The basic idea here is that as we add vars, we extend the list of vars in the dropdowns in this category
+// blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
+//   let variableModelList = workspace.getVariablesOfType("")
+//   let xmlList = ResizeArray<Element>()
+//   //Only create variable blocks if a variable has been defined
+//   if 0 < variableModelList.Count then
+//     let lastVarFieldXml = variableModelList.[variableModelList.Count - 1]
+//     if blockly?Blocks?variables_set then
+//       //variable set block
+//       let xml = Blockly.Utils.xml.createElement("block") 
+//       xml.setAttribute("type", "variables_set")
+//       xml.setAttribute("gap", if blockly?Blocks?math_change then "8" else "24")
+//       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//       xmlList.Add(xml)
+//     //variable incr block : TODO REPLACE WITH GENERALIZED INCR
+//     if blockly?Blocks?math_change then
+//       let xml = Blockly.Utils.xml.createElement("block") 
+//       xml.setAttribute("type", "math_change")
+//       xml.setAttribute("gap", if blockly?Blocks?math_change then "20" else "8")
+//       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//       let shadowBlockDom = Blockly.xml.textToDom("<value name='DELTA'><shadow type='math_number'><field name='NUM'>1</field></shadow></value>")
+//       xml.appendChild(shadowBlockDom) |> ignore
+//       xmlList.Add(xml)
+
+//     //switch intellisense blocks in category depending on current kernel
+//     let isR= 
+//       match GetKernel() with
+//       | Some(_,k) -> k.name = "ir"
+//       | _ -> false
+//     //variable property block
+//     if blockly?Blocks?varGetProperty_R && isR then
+//       let xml = Blockly.Utils.xml.createElement("block") 
+//       xml.setAttribute("type", "varGetProperty_R")
+//       xml.setAttribute("gap", if blockly?Blocks?varGetProperty then "20" else "8")
+//       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//       xmlList.Add(xml)
+//     //variable method block
+//     if blockly?Blocks?varDoMethod_R && isR then
+//       let xml = Blockly.Utils.xml.createElement("block") 
+//       xml.setAttribute("type", "varDoMethod_R")
+//       xml.setAttribute("gap", if blockly?Blocks?varDoMethod then "20" else "8")
+//       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//       xmlList.Add(xml)
+//     //variable create object block
+//     if blockly?Blocks?varCreateObject_R && isR then
+//       let xml = Blockly.Utils.xml.createElement("block") 
+//       xml.setAttribute("type", "varCreateObject_R")
+//       xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
+//       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//       xmlList.Add(xml)
+//     //variable indexer block
+//     // if blockly?Blocks?indexer then
+//     //   let xml = Blockly.Utils.xml.createElement("block") 
+//     //   xml.setAttribute("type", "indexer")
+//     //   xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
+//     //   xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+//     //   xmlList.Add(xml)
+//     //variable get block, one per variable: TODO - WHY DO WE NEED ONE PER VAR? LESS CLUTTER TO HAVE ONE WITH DROPDOWN
+//     if blockly?Blocks?variables_get then
+//       //for some reason the original "directly translated" code is passing the workspace into sort instead of the variables
+//       // variableModelList?sort( Blockly.variableModel.compareByName ) 
+//       let sortedVars = variableModelList |> Seq.sortBy( fun v -> v.name)
+//       for variable in sortedVars do
+//         let xml = Blockly.Utils.xml.createElement("block") 
+//         xml.setAttribute("type", "variables_get")
+//         xml.setAttribute("gap", "8")
+//         xml.appendChild( Blockly.variables.generateVariableFieldDom(variable)) |> ignore
+//         xmlList.Add(xml)
+//   xmlList
+
 
 /// A static toolbox copied from one of Google's online demos at https://blockly-demo.appspot.com/static/demos/index.html
 /// Curiously category names like "%{BKY_CATLOGIC}" not resolved by Blockly, even though the colors are, so names 
@@ -1032,15 +1180,13 @@ blockly?Variables?flyoutCategoryBlocks <- fun (workspace : Blockly.Workspace) ->
 let toolbox =
     """<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
     <category name="IMPORT" colour="255">
-      <block type="import"></block>
-      <!-- <block type="importAs"></block>
-      <block type="importFrom"></block> -->
+      <block type="import_R"></block>
     </category>
     <category name="FREESTYLE" colour="290">
-      <block type="dummyOutputCodeBlock"></block>
-      <block type="dummyNoOutputCodeBlock"></block>
-      <block type="valueOutputCodeBlock"></block>
-      <block type="valueNoOutputCodeBlock"></block>
+      <block type="dummyOutputCodeBlock_R"></block>
+      <block type="dummyNoOutputCodeBlock_R"></block>
+      <block type="valueOutputCodeBlock_R"></block>
+      <block type="valueNoOutputCodeBlock_R"></block>
     </category>
     <category name="LOGIC" colour="%{BKY_LOGIC_HUE}">
       <block type="controls_if"></block>
@@ -1077,8 +1223,6 @@ let toolbox =
           </shadow>
         </value>
       </block>
-      <!-- AO: python specific 
-      <block type="comprehensionForEach"></block> -->
       <block type="controls_forEach"></block>
       <block type="controls_flow_statements"></block>
     </category>
@@ -1259,14 +1403,6 @@ let toolbox =
           </shadow>
         </value>
       </block>
-      <!-- AO: python specific 
-      <block type="getInput">
-        <value name="x">
-          <shadow type="text">
-            <field name="TEXT">The prompt shown to the user</field>
-          </shadow>
-        </value>
-      </block> -->
     </category>
     <category name="LISTS" colour="%{BKY_LISTS_HUE}">
       <block type="lists_create_with">
@@ -1310,7 +1446,7 @@ let toolbox =
           </block>
         </value>
       </block>
-      <block type="indexer"></block>
+      <block type="indexer_R"></block>
       <block type="lists_split">
         <value name="DELIM">
           <shadow type="text">
@@ -1319,14 +1455,8 @@ let toolbox =
         </value>
       </block>
       <block type="lists_sort"></block>
-      <!-- AO: python specific 
-      <block type="setBlock"></block>
-      <block type="sortedBlock"></block>
-      <block type="zipBlock"></block>
-      <block type="dictBlock"></block>
-      <block type="tupleBlock"></block>
-      <block type="tupleConstructorBlock"></block>
-      <block type="reversedBlock"></block> -->
+      <block type="uniqueBlock_R"></block>
+      <block type="reversedBlock_R"></block>
     </category>
     <category name="COLOUR" colour="%{BKY_COLOUR_HUE}">
       <block type="colour_picker"></block>
@@ -1364,35 +1494,37 @@ let toolbox =
             <field name="NUM">0.5</field>
           </shadow>
         </value>
-      </block>Conversion
+      </block>
     </category>
-    <!-- AO: python specific 
     <category name="CONVERSION" colour="120">
-      <block type="boolConversion">
+      <block type="boolConversion_R">
       </block>
-      <block type="intConversion">
+      <block type="intConversion_R">
       </block>
-      <block type="floatConversion">
+      <block type="floatConversion_R">
       </block>
-      <block type="strConversion">
+      <block type="strConversion_R">
       </block>
-    </category> -->
-    <!-- AO: python specific 
+    </category>
     <category name="I/O" colour="190">
-      <block type="withAs">
-      </block>
-      <block type="textFromFile">
+      <block type="textFromFile_R">
         <value name="FILENAME">
           <shadow type="text">
             <field name="TEXT">name of file</field>
           </shadow>
         </value>
       </block>
-      <block type="readFile"></block>
-    </category> -->
+      <block type="readFile_R">
+        <value name="FILENAME">
+          <shadow type="text">
+            <field name="TEXT">name of file</field>
+          </shadow>
+        </value>
+      </block>
+    </category>
     <sep></sep>
     <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>
-    <!-- <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category> -->
+    <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category>
   </xml>"""
 
 
