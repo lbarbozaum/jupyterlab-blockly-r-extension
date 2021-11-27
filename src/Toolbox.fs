@@ -275,8 +275,8 @@ blockly?Blocks.[ "indexer_R" ] <- createObj [
     thisBlock.setInputsInline true
     thisBlock.setOutput true
     thisBlock.setColour !^230.0
-    thisBlock.setTooltip !^"Gets an item from the variable at a given index. Not supported for all variables."
-    thisBlock.setHelpUrl !^"https://rpubs.com/tomhopper/brackets"
+    thisBlock.setTooltip !^"Gets a list from the variable at a given indices. Not supported for all variables."
+    thisBlock.setHelpUrl !^"https://cran.r-project.org/doc/manuals/R-lang.html#Indexing"
   ]
 /// Generate R import code
 blockly?R.[ "indexer_R" ] <- fun (block : Blockly.Block) -> 
@@ -285,6 +285,26 @@ blockly?R.[ "indexer_R" ] <- fun (block : Blockly.Block) ->
   let code =  varName + "[" + input + "]" //+ "\n"
   [| code; blockly?R?ORDER_ATOMIC |]
 
+/// double indexer block
+blockly?Blocks.[ "doubleIndexer_R" ] <- createObj [
+  "init" ==> fun () -> 
+    thisBlock.appendValueInput("INDEX")
+      .appendField( !^(blockly.FieldVariable.Create("{dictVariable}") :?> Blockly.Field), "VAR"  )
+      .appendField( !^"[["  ) |> ignore          
+    thisBlock.appendDummyInput()
+      .appendField( !^"]]") |> ignore
+    thisBlock.setInputsInline true
+    thisBlock.setOutput true
+    thisBlock.setColour !^230.0
+    thisBlock.setTooltip !^"Gets an item from the variable at a given index. Not supported for all variables."
+    thisBlock.setHelpUrl !^"https://cran.r-project.org/doc/manuals/R-lang.html#Indexing"
+  ]
+/// Generate R import code
+blockly?R.[ "doubleIndexer_R" ] <- fun (block : Blockly.Block) -> 
+  let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  let input = blockly?R?valueToCode( block, "INDEX", blockly?R?ORDER_ATOMIC )
+  let code =  varName + "[[" + input + "]]" //+ "\n"
+  [| code; blockly?R?ORDER_ATOMIC |]
 
 /// A template for variable argument function block creation (where arguments are in a list), including the code generator.
 let makeFunctionBlock_R (blockName:string) (label:string) (outputType:string) (tooltip:string) (helpurl:string) (functionStr:string) =
@@ -981,7 +1001,12 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
         let (args : string) = blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER) 
         let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
         // For R, 'hasDot' means ::
-        varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
+        // special case for `%>%`
+        if cleanArgs = "" && memberName.StartsWith("`") then
+          varName + (if hasDot then "::" else "" ) + memberName
+        // normal case
+        else
+          varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
         // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
       else
         varName + (if hasDot then "::" else "" ) + memberName
@@ -1489,6 +1514,7 @@ let toolbox =
         </value>
       </block>
       <block type="indexer_R"></block>
+      <block type="doubleIndexer_R"></block>
       <block type="lists_split">
         <value name="DELIM">
           <shadow type="text">
