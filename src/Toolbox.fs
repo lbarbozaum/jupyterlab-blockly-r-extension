@@ -519,6 +519,7 @@ let requestInspectTimeout( queryString : string) = Promise.create(fun ok er ->
             JS.setTimeout (fun () -> er( failwith ("timeout:" + queryString ) )) 100 (* ms *) |> ignore
         )
 /// Get an inspection (shift+tab) using the kernel. AFAIK this only works after a complete known identifier.
+/// In R, this *does not* work for package names - they show as not existing
 let GetKernalInspection( queryString : string ) =
   // Browser.Dom.console.log("Requesting inspection for: " + queryString)
   // if queryString = "dataframe.style" then
@@ -614,10 +615,23 @@ let intellisenseLookup = new System.Collections.Generic.Dictionary<string,Intell
 // let nameDocMap = new System.Collections.Generic.Dictionary<string,string>()
 
 /// Determine if an entry is a function. We have separate blocks for properties and functions because only function blocks need parameters
-let isFunction_R( info : string ) = info.Contains("Type: function")
+/// This is a bit weird for R; not sure about standardization of this information
+/// We need some special handling for cases like dplyr %>%, which is surrounded in backticks
+let isFunction_R (query : string) ( info : string )  = 
+  // Using UNDEFINED doesn't work because the package/parent is itself undefined and causes the blocks to fail if we call the parent a function
+  // if info = "UNDEFINED" || info = "" then 
+  // %>% is enclosed in backticks
+  if query.StartsWith("`") then
+    true
+  else
+    info.Contains("Class attribute:\n'function'") || (info.Contains("Usage") && info.Contains("Arguments"))
+
+// BELOW IS WORKING
+// let isFunction_R( info : string ) = info.Contains("Class attribute:\n'function'") || (info.Contains("Usage") && info.Contains("Arguments"))
 
 /// Determine if an entry is a class. 
-let isClass_R( info : string ) = info.Contains("Type: class")
+/// Again weird for R; making it the inverse of function
+let isClass_R( info : string ) =  info |> isFunction_R "" |> not
 
 /// Request an IntellisenseVariable. If the type does not descend from object, the children will be empty.
 /// Sometimes we will create a variable but it will have no type until we make an assignment. 
@@ -628,8 +642,9 @@ let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string )
   // Update the intellisenseLookup asynchronously. First do an info lookup. If var is not an instance type, continue to doing tooltip lookup
   promise {
     try
+      //This does not work for R package names, only variables
       let! parentInspection = GetKernalInspection( parentName )
-      let parent = { Name=parentName;  Info=parentInspection; isFunction=isFunction_R(parentInspection); isClass=isClass_R(parentInspection) }
+      let parent = { Name=parentName;  Info=parentInspection; isFunction=isFunction_R parentName parentInspection; isClass=isClass_R(parentInspection) }
       // V2 store the name/docstring pair. This is always overwritten(*Updating*).
       // if not <| nameDocMap.ContainsKey( parentName ) then nameDocMap.Add(parentName,parentInspection) else nameDocMap.[parentName] <- parentInspection
 
@@ -643,20 +658,35 @@ let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string )
         | true, cached -> if cached.VariableEntry.Info <> parent.Info || cached.ChildEntries.Length = 0 then true else false
         | false, _ -> true
           
+      // Use $ and :: for completions and otherwise adjust Python specific concepts to R
+      // Code below is basically the same as Python except for small changes:
+      // - remove special case for dataframe
+      // - support multiple symbols for intellisense completion (Python is only dot)
+      // - child inspection ?no longer? requires inserting the symbol between the parent and completion; the completion includes the parent/symbol prefix
       if shouldGetChildren then
-        let! completions = GetKernelCompletion( parentName + "." )  //all completions that follow "name."
+        // let! completions = GetKernelCompletion( parentName + "." )  //all completions that follow "name."
+        let! packageCompletions = GetKernelCompletion( parentName + "::" )  //all completions that follow "name."
+        // NOTE: removing $ completions because we currently don't handle dynamic updates, and that is the primary use case for $
+        // let! nameCompletions = GetKernelCompletion( parentName + "$" )  //all completions that follow "name."
+
+        // let safeCompletions = Array.append packageCompletions  nameCompletions
+        let safeCompletions = packageCompletions
+
+        // below seems unnecessary b/c symbol is stored in completion
+        // let completionSymbols = Array.append (Array.create (packageCompletions.Length) "::") (Array.create (nameCompletions.Length) "$")
+        // let safeCompletions = Array.zip completions completionSymbols
 
         //dataframe kludge; TODO not sure why this is necessary
         //if dataframe, filter members leading with _ ; else filter nothing
-        let safeCompletions =
-          completions
-          //|> Array.truncate 169 //100 works, 150 works, 168 (std) works, 169 (style) fails --> no GUI intellisense either, 170 fails, 172 fails, 174 fails, 175 (T) fails, 200 fails
-          |> Array.filter( fun s -> 
-            if parent.Info.StartsWith("Signature: DataFrame") then
-              not <| s.StartsWith("_") &&  not <| s.StartsWith("style") //TODO: kludge for dataframe.style since race above doesn't always work
-            else
-              true
-              )      
+        // let safeCompletions =
+        //   completions
+        //   //|> Array.truncate 169 //100 works, 150 works, 168 (std) works, 169 (style) fails --> no GUI intellisense either, 170 fails, 172 fails, 174 fails, 175 (T) fails, 200 fails
+        //   |> Array.filter( fun s -> 
+        //     if parent.Info.StartsWith("Signature: DataFrame") then
+        //       not <| s.StartsWith("_") &&  not <| s.StartsWith("style") //TODO: kludge for dataframe.style since race above doesn't always work
+        //     else
+        //       true
+        //       )      
         
         //Fails the same way 6/11/20
         // let completionPromises = new ResizeArray<JS.Promise<string>>()
@@ -670,7 +700,9 @@ let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string )
 
           //Suddenly started failing 6/11/20
           safeCompletions
-          |> Array.map( fun completion ->  GetKernalInspection(parentName + "." + completion) ) //all introspections of name.completion
+          //For R, completion includes parent and following symbolc
+          //for Python was (parentName + "." + completion)
+          |> Array.map( fun completion ->  GetKernalInspection(completion) ) 
           |> Promise.Parallel
 
           //Fails the same way 6/11/20
@@ -684,8 +716,13 @@ let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string )
         let children = 
             Array.zip safeCompletions inspections 
             |> Array.map( fun (completion,inspection) -> 
-              {Name=completion; Info=inspection; isFunction=isFunction_R(inspection); isClass=isClass_R(inspection) }
+              //R only: remove parent name and symbol from completion (so it doesn't show in intelliblock dropdown)
+              let childName = completion.Replace(parentName + "::","")
+              //We can't remove backticks if we prefix calls with the package name
+              // let safeName = childName.Replace("`","")
+              {Name=childName; Info=inspection; isFunction=isFunction_R childName inspection; isClass=isClass_R(inspection) }
             ) 
+            |> Array.sortBy( fun c -> c.Name )
         let intellisenseVariable = { VariableEntry=parent; ChildEntries=children}
         // Store so we can synchronously find results later; if we have seen this var before, overwrite.
         if intellisenseLookup.ContainsKey( parentName ) then
@@ -943,10 +980,11 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
       else if hasArgs then
         let (args : string) = blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER) 
         let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
-        varName + (if hasDot then "." else "" ) + memberName + "(" +  cleanArgs + ")" 
+        // For R, 'hasDot' means ::
+        varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
         // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
       else
-        varName + (if hasDot then "." else "" ) + memberName
+        varName + (if hasDot then "::" else "" ) + memberName
     [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 //Intellisense variable get property block
@@ -966,6 +1004,7 @@ makeMemberIntellisenseBlock_R
   (fun (ie : IntellisenseEntry) -> ie.isFunction )
   true //has arguments
   true //has dot
+
 
 //Intellisense class constructor block
 makeMemberIntellisenseBlock_R 
@@ -1055,13 +1094,16 @@ let flyoutCategoryBlocks_R = fun (workspace : Blockly.Workspace) ->
       xml.setAttribute("gap", if blockly?Blocks?varDoMethod then "20" else "8")
       xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
       xmlList.Add(xml)
+    //R basically doesn't have constructors, so this block is not useful;
+    // as of 11/26/21, it basically duplicates the property block
     //variable create object block
-    if blockly?Blocks?varCreateObject_R then //&& isR then
-      let xml = Blockly.Utils.xml.createElement("block") 
-      xml.setAttribute("type", "varCreateObject_R")
-      xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
-      xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
-      xmlList.Add(xml)
+    // if blockly?Blocks?varCreateObject_R then //&& isR then
+    //   let xml = Blockly.Utils.xml.createElement("block") 
+    //   xml.setAttribute("type", "varCreateObject_R")
+    //   xml.setAttribute("gap", if blockly?Blocks?varCreateObject then "20" else "8")
+    //   xml.appendChild( Blockly.variables.generateVariableFieldDom(lastVarFieldXml)) |> ignore
+    //   xmlList.Add(xml)
+
     //variable indexer block
     // if blockly?Blocks?indexer then
     //   let xml = Blockly.Utils.xml.createElement("block") 
