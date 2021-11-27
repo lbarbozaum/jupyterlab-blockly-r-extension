@@ -583,7 +583,7 @@ Blockly.R['lists_sort'] = function(block) {
   var direction = block.getFieldValue('DIRECTION') === '1' ? 'FALSE' : 'TRUE';
   //AO: doesn't seem like R allows us to mess with type (numeric/alphabetical)
   var type = block.getFieldValue('TYPE');
-  var code = 'list(sort(unlist(' + list + '), decreasing=' + direction + '))';
+  var code = 'as.list(sort(unlist(' + list + '), decreasing=' + direction + '))';
   return [code,   Blockly.R.ORDER_FUNCTION_CALL];
 };
 
@@ -1482,7 +1482,7 @@ Blockly.R['procedures_defreturn'] = function(block) {
         Blockly.Variables.NAME_TYPE);
   }
   var code = funcName + ' <- function(' + args.join(', ') + ') {\n' +
-      xfix1 + loopTrap + branch + xfix2 + returnValue + '}';
+      xfix1 + loopTrap + branch + xfix2 + returnValue + '}\n';
   code = Blockly.R.scrub_(block, code);
   // Add % so as not to collide with helper functions in definitions list.
   Blockly.R.definitions_['%' + funcName] = code;
