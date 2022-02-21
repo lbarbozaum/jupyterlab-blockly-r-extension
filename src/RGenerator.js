@@ -10,6 +10,9 @@ import Blockly from 'blockly';
  */
 Blockly.R = new Blockly.Generator('R');
 
+//AO: 20220221 trying a dummy export to see if node will then load the module; 
+export const empty_string = "";
+
 /**
  * List of illegal variable names.
  * This is not intended to be a security feature.  Blockly is 100% client-side,

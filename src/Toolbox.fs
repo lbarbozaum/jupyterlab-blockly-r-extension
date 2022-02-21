@@ -17,7 +17,12 @@ open JupyterlabServices.__kernel_messages.KernelMessage
 // in js with an import here, matching the loading in Blockly's 
 // node.js.
 
-importSideEffects("./RGenerator.js")
+// 2/21/22
+//This works in dev but fails in deploy; "RGenerator.js" is in deployed files but does not show in Chrome Sources Page view when deployed
+// importSideEffects("./RGenerator.js") 
+
+// A single member import invokes all side effects in dev; hopefully this will cause loading in deploy
+let empty_string : string = importMember "./RGenerator.js"
 
 
 //=================================================================
