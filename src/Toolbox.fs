@@ -157,6 +157,7 @@ let decodeWorkspace( xmlText ) =
   //[| code; blockly?R?ORDER_ATOMIC |] 
 
 
+
 // TEXT file read block
 blockly?Blocks.["textFromFile_R"] <- createObj [
   "init" ==> fun () ->
@@ -484,6 +485,174 @@ blockly?R.["uniqueBlock_R"] <- fun (block : Blockly.Block) ->
   let (args : string) = blockly?R?valueToCode(block, "LIST", blockly?R?ORDER_MEMBER) 
   let code = "unique(unlist(" + args + ", use.names = FALSE))" 
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
+
+//==== EXPERIMENTAL MUTATOR SECTION ======================================
+// Somewhat bizarrely, thes are not exported by @blockly/block-plus-minus, so we reference local copies
+[<ImportMember("./field_plus.js")>]
+let createPlusField( o: obj): Blockly.FieldImage = jsNative
+[<ImportMember("./field_minus.js")>]
+let createMinusField( o: obj): Blockly.FieldImage = jsNative
+
+/// A mutator for dynamic arguments. A block using this mutator must have a dummy called "EMPTY" and must register this mutator
+let createDynamicArgumentMutator ( mutatorName : string) (startCount : int) (emptyLeadSlotLabel:string) (nonEmptyLeadSlotLabel:string) (additionalSlotLabel : string)= 
+  let mutator = 
+    createObj [
+      "itemCount_" ==> 0
+      "mutationToDom" ==> fun () ->
+        let container = Blockly.utils?xml?createElement("mutation");
+        container?setAttribute("items",thisBlock?itemCount_)
+        container
+      "domToMutation" ==>  fun(xmlElement ) ->
+        let targetCount = System.Int32.Parse(xmlElement?getAttribute("items"))
+        thisBlock?updateShape_(targetCount);
+      "updateShape_" ==>  fun(targetCount) ->
+        while unbox<int>(thisBlock?itemCount_) < targetCount do
+          thisBlock?addPart_();
+        while unbox<int>(thisBlock?itemCount_) > targetCount do
+          thisBlock?removePart_();
+        thisBlock?updateMinus_();
+      "plus" ==>  fun() ->
+        thisBlock?addPart_();
+        thisBlock?updateMinus_();
+      "minus" ==>  fun() ->
+        if thisBlock?itemCount_ <> 0 then
+          thisBlock?removePart_();
+          thisBlock?updateMinus_();
+      "addPart_" ==> fun() ->
+        if thisBlock?itemCount_ = 0 then
+          thisBlock.removeInput("EMPTY");
+          thisBlock?topInput_ <- thisBlock.appendValueInput("ADD" + thisBlock?itemCount_)
+              .appendField(U2.Case2(!!createPlusField() ), "PLUS")
+              //label that goes where "create list with" normally goes
+              .appendField(U2.Case1(nonEmptyLeadSlotLabel)) //|> ignore
+        else
+          thisBlock.appendValueInput("ADD" + thisBlock?itemCount_) //|> ignore
+              //the next two lines affect the label that goes with every additional slot
+              .appendField(U2.Case1(additionalSlotLabel))
+              .setAlign(blockly.ALIGN_RIGHT) |> ignore
+        thisBlock?itemCount_ <- thisBlock?itemCount_ + 1
+      "removePart_" ==> fun() -> 
+        thisBlock?itemCount_ <- thisBlock?itemCount_ - 1
+        thisBlock?removeInput("ADD" + thisBlock?itemCount_);
+        if thisBlock?itemCount_ = 0 then
+          thisBlock?topInput_ <- thisBlock.appendDummyInput("EMPTY")
+              .appendField(U2.Case2(!!createPlusField()), "PLUS")
+              //label that goes where "create empty list" normally goes
+              .appendField(U2.Case1(emptyLeadSlotLabel)) //|> ignore
+      "updateMinus_" ==> fun() ->
+        let minusField = thisBlock.getField("MINUS");
+        if minusField = null && thisBlock?itemCount_ > 0 then
+          thisBlock?topInput_?insertFieldAt(1, createMinusField(), "MINUS");
+        elif minusField <> null && thisBlock?itemCount_ < 1 then
+          thisBlock?topInput_?removeField("MINUS");
+    ]
+  let helper() = 
+    thisBlock.getInput("EMPTY").insertFieldAt(0.0, U2.Case2(!!createPlusField()), "PLUS") |> ignore
+    thisBlock?updateShape_(startCount) //|> ignore
+
+  //register the mutator
+  // let test = createPlusField()
+  // test <> test |> ignore
+  Blockly.extensions.registerMutator( mutatorName, !!mutator, !!helper)
+
+// Create mutator-extended blocks
+/// ORIGINAL APPROACH
+/// Use list mutator like a mixin
+/// Works but not compatible with plus/minus extension
+/// Mixin approach doesn't work with plus/minus extension because that has too much list UI embedded in it
+/// deep clone
+[<Emit("Object.assign({}, $0)")>]
+let clone (x: obj) : obj = jsNative
+
+/// deep clone list as a base, then modify init and updateShape
+blockly?Blocks.["pipe_R"] <- clone( blockly?Blocks.["lists_create_with"] )
+
+//check if we are using the plus/minus extension; if not, use non-mixin approach
+if blockly?Extensions?ALL_?new_list_create_with_mutator = null then
+  blockly?Blocks.["pipe_R"]?init <- fun () -> 
+        // Browser.Dom.console.log( "pipe_R" + " init")
+        let input = thisBlock.appendValueInput("INPUT") //else thisBlock.appendDummyInput("INPUT")
+        input.appendField(!^"pipe") |> ignore
+        // thisBlock.setInputsInline(true)
+        thisBlock?itemCount_ <- 1;
+        thisBlock?updateShape_()
+        thisBlock.setOutput(true) //U3.Case1("Array"))
+
+        // //check if we are using the plus/minus extension; if so, use that mutator
+        // let mutatorName = 
+        //   // the plus/minus extension will have registered this mutator
+        //   if blockly?Extensions?ALL_?new_list_create_with_mutator <> null then
+        //     "new_list_create_with_mutator"
+        //   else
+        //     "lists_create_with_item"
+        
+        thisBlock.setMutator( blockly.Mutator.Create( [|"lists_create_with_item"|] ) )
+        thisBlock.setColour !^230.0
+        thisBlock.setTooltip !^"A dplyr pipe, i.e. %>%"
+        thisBlock.setHelpUrl !^""
+  blockly?Blocks.["pipe_R"]?updateShape_ <- fun () -> 
+        //remove empty label if list nonempty
+        if thisBlock?itemCount_ > 0 && thisBlock.getInput("EMPTY") <> null then
+          thisBlock.removeInput("EMPTY")
+        //add empty label if list empty
+        elif thisBlock?itemCount_ = 0 && thisBlock.getInput("EMPTY") = null then
+          thisBlock.appendDummyInput("EMPTY")
+            .appendField(U2.Case1("add a destination")) |> ignore
+
+        //add inputs for each item in list
+        let mutable index = 0
+        for i = 0 to thisBlock?itemCount_ - 1 do 
+          index <- i
+          if thisBlock.getInput("ADD" + string(i)) = null then
+            thisBlock.appendValueInput("ADD" + string(i))
+              .appendField(U2.Case1("to"))
+              .setAlign(blockly.ALIGN_RIGHT) |> ignore
+        index <- index + 1
+
+        //remove deleted inputs
+        while thisBlock.getInput("ADD" + string(index)) <> null do
+          thisBlock.removeInput("ADD" + string(index))
+          index <- index + 1
+else
+  //NEW APPROACH - uses the plus/minus based mutator
+  //Use a mixin-compatible init
+  createDynamicArgumentMutator "pipeMutator" 1 "add pipe output" "to" "then to"
+  blockly?Blocks.["pipe_R"]?init <- fun () -> 
+      // Browser.Dom.console.log( "pipe_R" + " init")
+      let input = thisBlock.appendValueInput("INPUT") //else thisBlock.appendDummyInput("INPUT")
+      input.appendField(!^"pipe") |> ignore
+      let empty = thisBlock.appendDummyInput("EMPTY")
+      // empty.appendField(!^"pipe") |> ignore
+
+      thisBlock.setOutput(true) //U3.Case1("Array"))
+
+      // this seems to invoke the old mutator approach, not an extension
+      // thisBlock.setMutator( blockly.Mutator.Create( [|"new_list_create_with_mutator"|] ) )
+      // the following call seems technically correct, yet fails
+      blockly?Extensions?apply("pipeMutator",thisBlock,true)
+      // this should be identical to "apply" above
+      // thisBlock.jsonInit(
+      //   createObj [
+      //               "mutator" ==> "new_list_create_with_mutator"
+      //   ] |> unbox        
+      // )
+      thisBlock.setColour !^230.0
+      thisBlock.setTooltip !^"A dplyr pipe, i.e. %>%"
+      thisBlock.setHelpUrl !^""
+
+
+
+/// Generate R template conversion code
+blockly?R.["pipe_R"] <- fun (block : Blockly.Block) -> 
+  let elements : string[] = 
+    [|
+      for i = 0 to block?itemCount_ - 1 do
+        yield  blockly?R?valueToCode(block, "ADD" + string(i), blockly?R?ORDER_COMMA)
+    |]
+  let input =  blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER)
+  let code = input + " %>% " + (String.concat " %>% " elements)
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
+
 
 
 //TODO: 
@@ -1594,6 +1763,7 @@ let toolbox =
           </shadow>
         </value>
       </block>
+      <block type="pipe_R"></block>
     </category>
     <sep></sep>
     <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>

@@ -4323,7 +4323,7 @@ module Blockly =
     type [<AllowNullLiteral>] Mutator__ClassStatic =
         /// <summary>Class for a mutator dialog.</summary>
         /// <param name="quarkNames">List of names of sub-blocks for flyout.</param>
-        [<Emit "new $0($1...)">] abstract Create: quarkNames: ResizeArray<string> -> Mutator__Class
+        [<Emit "new $0($1...)">] abstract Create: quarkNames: ResizeArray<string> -> Mutator //Mutator__Class
 
     module Mutator =
 
