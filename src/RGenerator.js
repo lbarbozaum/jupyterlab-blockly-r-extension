@@ -2,6 +2,7 @@
 // using additional examples from lua.js
 // and inlining relevant modified blocks from blockly-3.20191014.4/generators/javascript
 import Blockly from 'blockly';
+import '@blockly/block-plus-minus'; //AO: 20220223 trying plus/minus for UI improvement generally but %>% improvement specifically
 
 
 /**
@@ -10,7 +11,8 @@ import Blockly from 'blockly';
  */
 Blockly.R = new Blockly.Generator('R');
 
-//AO: 20220221 trying a dummy export to see if node will then load the module; 
+//AO: 20220221 importWithSideEffects does not work in deploy - the module is never loaded
+// adding a dummy export causes the module to load
 export const empty_string = "";
 
 /**
