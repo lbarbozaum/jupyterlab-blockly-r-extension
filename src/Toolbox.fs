@@ -525,6 +525,8 @@ let createDynamicArgumentMutator ( mutatorName : string) (startCount : int) (emp
               .appendField(U2.Case2(!!createPlusField() ), "PLUS")
               //label that goes where "create list with" normally goes
               .appendField(U2.Case1(nonEmptyLeadSlotLabel)) //|> ignore
+              .setAlign(blockly.ALIGN_RIGHT) //e.g. gets "using" label closer to slot in question
+
         else
           thisBlock.appendValueInput("ADD" + thisBlock?itemCount_) //|> ignore
               //the next two lines affect the label that goes with every additional slot
@@ -640,7 +642,7 @@ blockly?R.["pipe_R"] <- fun (block : Blockly.Block) ->
         yield  blockly?R?valueToCode(block, "ADD" + string(i), blockly?R?ORDER_COMMA)
     |]
   let input =  blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER)
-  let code = input + " %>% " + (String.concat " %>% " elements)
+  let code = input + " %>%\n    " + (String.concat " %>%\n    " elements)
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 
@@ -1010,7 +1012,7 @@ let SafeRemoveInput( block:Blockly.Block ) ( inputName : string )=
 
 
 // Dynamic argument mutator for intelliblocks
-createDynamicArgumentMutator "intelliblockMutator" 0 "add argument" "using" "and"
+createDynamicArgumentMutator "intelliblockMutator" 1 "add argument" "using" "and"
 
 
 // TODO: MAKE BLOCK THAT ALLOWS USER TO MAKE AN ASSIGNMENT TO A PROPERTY (SETTER)
@@ -1105,7 +1107,7 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
       // mutator approach
       let input = thisBlock.appendDummyInput("INPUT")
       input
-        .appendField(!^preposition) 
+        .appendField(!^preposition)
 
         //Use the validator called on variable selection to change the member dropdown so that we get correct members when variable changes
         .appendField( !^(blockly.FieldVariable.Create("variable name", System.Func<string,obj>( fun newSelection ->
