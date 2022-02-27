@@ -619,23 +619,13 @@ else
   createDynamicArgumentMutator "pipeMutator" 1 "add pipe output" "to" "then to"
   blockly?Blocks.["pipe_R"]?init <- fun () -> 
       // Browser.Dom.console.log( "pipe_R" + " init")
-      let input = thisBlock.appendValueInput("INPUT") //else thisBlock.appendDummyInput("INPUT")
+      let input = thisBlock.appendValueInput("INPUT") 
       input.appendField(!^"pipe") |> ignore
       let empty = thisBlock.appendDummyInput("EMPTY")
-      // empty.appendField(!^"pipe") |> ignore
 
       thisBlock.setOutput(true) //U3.Case1("Array"))
-
-      // this seems to invoke the old mutator approach, not an extension
-      // thisBlock.setMutator( blockly.Mutator.Create( [|"new_list_create_with_mutator"|] ) )
-      // the following call seems technically correct, yet fails
       blockly?Extensions?apply("pipeMutator",thisBlock,true)
-      // this should be identical to "apply" above
-      // thisBlock.jsonInit(
-      //   createObj [
-      //               "mutator" ==> "new_list_create_with_mutator"
-      //   ] |> unbox        
-      // )
+
       thisBlock.setColour !^230.0
       thisBlock.setTooltip !^"A dplyr pipe, i.e. %>%"
       thisBlock.setHelpUrl !^""
@@ -1005,12 +995,23 @@ let UpdateAllIntellisense_R() =
   for b in blocks do
     b?updateIntellisense(b,None, requestAndStubOptions_R b) 
 
-/// Remove a field from a block safely, even if it doesn't exist
+/// Remove a field from an input safely, even if it doesn't exist
 let SafeRemoveField( block:Blockly.Block ) ( fieldName : string ) ( inputName : string )=
   match block.getField(fieldName), block.getInput(inputName) with
   | null, _ -> ()  //field doesnt exist, no op
   | _, null ->  Browser.Dom.console.log( "error removing (" + fieldName + ") from block; input (" + inputName + ") does not exist" )
   | _,input -> input.removeField( fieldName )
+
+/// Remove an input safely, even if it doesn't exist
+let SafeRemoveInput( block:Blockly.Block ) ( inputName : string )=
+  match block.getInput(inputName) with
+  | null -> ()  //input doesnt exist, no op
+  | input -> block.removeInput(inputName)
+
+
+// Dynamic argument mutator for intelliblocks
+createDynamicArgumentMutator "intelliblockMutator" 0 "add argument" "using" "and"
+
 
 // TODO: MAKE BLOCK THAT ALLOWS USER TO MAKE AN ASSIGNMENT TO A PROPERTY (SETTER)
 // TODO: CHANGE OUTPUT CONNECTOR DEPENDING ON INTELLISENSE: IF FUNCTION DOESN'T HAVE AN OUTPUT, REMOVE CONNECTOR
@@ -1088,9 +1089,10 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
       memberField.setTooltip( !^( getIntellisenseMemberTooltip varUserName (memberField.getText()) ) )
 
       //add more fields if arguments are needed. Current strategy is to make those their own block rather than adding mutators to this block
-      if hasArgs then
-          input.appendField(!^"using", "USING") |> ignore
-          thisBlockClosure.setInputsInline(true);
+      // if hasArgs then
+      //     input.appendField(!^"using", "USING") |> ignore
+      //     thisBlockClosure.setInputsInline(true);
+
 
     "init" ==> fun () -> 
       Browser.Dom.console.log( blockName + " init")
@@ -1098,7 +1100,10 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
       //If we need to pass "this" into a closure, we rename to work around shadowing
       let thisBlockClosure = thisBlock
 
-      let input = if hasArgs then thisBlock.appendValueInput("INPUT") else thisBlock.appendDummyInput("INPUT")
+      // original (non-mutator) approach
+      // let input = if hasArgs then thisBlock.appendValueInput("INPUT") else thisBlock.appendDummyInput("INPUT")
+      // mutator approach
+      let input = thisBlock.appendDummyInput("INPUT")
       input
         .appendField(!^preposition) 
 
@@ -1118,11 +1123,18 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
         // .appendField( !^(blockly.FieldDropdown.Create( thisBlock?varSelectionUserName(thisBlockClosure, None) |> requestAndStubOptions thisBlock ) :> Blockly.Field), "MEMBER"  ) |> ignore 
       thisBlockClosure?updateIntellisense( thisBlockClosure, None, requestAndStubOptions_R thisBlockClosure) //adds the member fields, triggering intellisense
 
-      if hasArgs then thisBlock.setInputsInline(true)
+      // original (non mutator) approach
+      // if hasArgs then thisBlock.setInputsInline(true)
       thisBlock.setOutput(true)
       thisBlock.setColour !^230.0
       thisBlock.setTooltip !^"!Not defined until you execute code."
       thisBlock.setHelpUrl !^""
+
+      //New mutator approach: must apply mutator on init
+      //SafeRemoveInput thisBlockClosure "EMPTY"
+      if hasArgs then
+        thisBlock.appendDummyInput("EMPTY") |> ignore
+        blockly?Extensions?apply("intelliblockMutator",thisBlock,true)
 
     //Listen for intellisense ready events
     "onchange" ==> fun (e:Blockly.Events.Change) ->
@@ -1163,28 +1175,58 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
         ()
     ]
   /// Generate R intellisense member block conversion code
+  // original (non-mutator) approach
+  // blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
+  //   let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  //   let memberName = block.getFieldValue("MEMBER").Value |> string
+  //   // let x = blockly?R?valueToCode( block, "VAR", blockly?R?ORDER_ATOMIC )
+  //   let code =  
+  //     //All of the "not defined" option messages start with "!"
+  //     if memberName.StartsWith("!") then
+  //       ""
+  //     else if hasArgs then
+  //       let (args : string) = blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER) 
+  //       let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
+  //       // For R, 'hasDot' means ::
+  //       // special case for `%>%`
+  //       if cleanArgs = "" && memberName.StartsWith("`") then
+  //         varName + (if hasDot then "::" else "" ) + memberName
+  //       // normal case
+  //       else
+  //         varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
+  //       // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
+  //     else
+  //       varName + (if hasDot then "::" else "" ) + memberName
+  //   [| code; blockly?R?ORDER_FUNCTION_CALL |]
+
+  //mutator approach
   blockly?R.[blockName] <- fun (block : Blockly.Block) -> 
-    let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
-    let memberName = block.getFieldValue("MEMBER").Value |> string
-    // let x = blockly?R?valueToCode( block, "VAR", blockly?R?ORDER_ATOMIC )
-    let code =  
-      //All of the "not defined" option messages start with "!"
-      if memberName.StartsWith("!") then
-        ""
-      else if hasArgs then
-        let (args : string) = blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER) 
-        let cleanArgs = System.Text.RegularExpressions.Regex.Replace(args,"^\[|\]$" , "")
-        // For R, 'hasDot' means ::
-        // special case for `%>%`
-        if cleanArgs = "" && memberName.StartsWith("`") then
-          varName + (if hasDot then "::" else "" ) + memberName
-        // normal case
-        else
-          varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
-        // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
-      else
+  let varName = blockly?R?variableDB_?getName( block.getFieldValue("VAR").Value |> string, blockly?Variables?NAME_TYPE);
+  let memberName = block.getFieldValue("MEMBER").Value |> string
+  // let x = blockly?R?valueToCode( block, "VAR", blockly?R?ORDER_ATOMIC )
+  let code =  
+    //All of the "not defined" option messages start with "!"
+    if memberName.StartsWith("!") then
+      ""
+    else if hasArgs then
+      let args : string[] = 
+        [|
+          for i = 0 to block?itemCount_ - 1 do
+            yield  blockly?R?valueToCode(block, "ADD" + string(i), blockly?R?ORDER_COMMA)
+        |]
+      let cleanArgs = String.concat "," args
+      // For R, 'hasDot' means ::
+      // TODO: special case for pipe no longer meaningful here since we've created a proper pipe block
+      // special case for `%>%`
+      if cleanArgs = "" && memberName.StartsWith("`") then
         varName + (if hasDot then "::" else "" ) + memberName
-    [| code; blockly?R?ORDER_FUNCTION_CALL |]
+      // normal case
+      else
+        varName + (if hasDot then "::" else "" ) + memberName + "(" +  cleanArgs + ")" 
+      // varName + (if hasDot then "." else "" ) + memberName + "(" +  args.Trim([| '['; ']' |]) + ")" //looks like a bug in Fable, brackets not getting trimmed?
+    else
+      varName + (if hasDot then "::" else "" ) + memberName
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 //Intellisense variable get property block
 makeMemberIntellisenseBlock_R
