@@ -13,9 +13,12 @@ open JupyterlabServices.__kernel_kernel.Kernel
 // open JupyterlabNotebook.Tokens
 // open JupyterlabApputils.Types
 
+[<Emit("new Event($0...)")>] 
+let makeEvent ( ``type`` : string) : Event =  jsNative
+
 //tricky here: if we try to make collection of requires, F# complains they are different types unless we specify obj type
 let mutable requires: obj array =
-    [| JupyterlabApputils.ICommandPalette; JupyterlabNotebook.Tokens.Types.INotebookTracker; JupyterlabApplication.ILayoutRestorer |]
+    [| JupyterlabApputils.ICommandPalette; JupyterlabNotebook.Tokens.Types.INotebookTracker; JupyterlabApplication.ILayoutRestorer; JupyterlabCoreutils.Statedb.Types.IStateDB |]
 
 //https://stackoverflow.com/questions/47640263/how-to-extend-a-js-class-in-fable
 [<Import("Widget", from = "@phosphor/widgets")>]
@@ -94,6 +97,31 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             syncCheckboxLabel.setAttribute("for", "syncCheckboxR")
             buttonDiv.appendChild( syncCheckbox) |> ignore
             buttonDiv.appendChild( syncCheckboxLabel) |> ignore
+
+            //checkbox for intellisense cache
+            let cacheCheckbox = document.createElement ("input")
+            cacheCheckbox.setAttribute("type", "checkbox")
+            cacheCheckbox.id <- "cacheCheckboxR"
+            //event handlers for cache
+            cacheCheckbox.onchange <- fun( e ) ->
+              let url = Browser.Dom.window.location.href
+              if (e.currentTarget:?> HTMLInputElement).``checked`` then //This line will never be called if the checkbox is on by default
+                //append workspace url if it is missing
+                if not <| url.Contains("workspaces/cache") then
+                  Browser.Dom.window.location.assign( url.Replace("/lab","/lab/workspaces/cache"))
+              else
+                //reset our workspace
+                let baseUrl = url.Substring(0,url.IndexOf("/lab"))
+                Browser.Dom.window.location.assign( baseUrl + "/lab/workspaces/cache?reset")
+
+            //turn on cache by default; we want this to throw the event on startup
+            cacheCheckbox?``checked`` <- true 
+            cacheCheckbox.dispatchEvent( makeEvent("change") ) |> ignore
+            let cacheCheckboxLabel = document.createElement ("label")
+            cacheCheckboxLabel.innerText <- "Use cache"
+            cacheCheckboxLabel.setAttribute("for", "cacheCheckboxR")
+            buttonDiv.appendChild( cacheCheckbox) |> ignore
+            buttonDiv.appendChild( cacheCheckboxLabel) |> ignore
 
             //TODO: this works, but not across multiple open notebooks. Need a better understanding of how blockly implements multiple workspaces
             //checkbox for autosave (force blocks to code if moving away from cell that already has blocks to code in it)
@@ -401,6 +429,8 @@ let onNotebookChanged =
             //
             true
           )
+[<Emit("Object.keys($0)")>]
+let objectKeys (x: 'a) : string [] = jsNative
 
 /// The extension
 let extension =
@@ -411,7 +441,7 @@ let extension =
           //------------------------------------------------------------------------------------------------------------
           //NOTE: this **must** be wrapped in a Func, otherwise the arguments are tupled and Jupyter doesn't expect that
           //------------------------------------------------------------------------------------------------------------
-          "activate" ==> System.Func<JupyterlabApplication.JupyterFrontEnd<JupyterlabApplication.LabShell>, JupyterlabApputils.ICommandPalette, JupyterlabNotebook.Tokens.INotebookTracker, JupyterlabApplication.ILayoutRestorer, unit>(fun app palette notebooks restorer ->
+          "activate" ==> System.Func<JupyterlabApplication.JupyterFrontEnd<JupyterlabApplication.LabShell>, JupyterlabApputils.ICommandPalette, JupyterlabNotebook.Tokens.INotebookTracker, JupyterlabApplication.ILayoutRestorer, JupyterlabCoreutils.Statedb.IStateDB, unit>(fun app palette notebooks restorer state ->
                             console.log ("jupyterlab_blockly_extension_r: activated")
                             
                             //Create a blockly widget and place inside main area widget
@@ -421,9 +451,43 @@ let extension =
                             //Add application command to display
                             let command = "blockly_r:open"
 
-                            //Set up widget tracking to restore state
+                            //Set up widget tracking to restore layout state
                             let tracker = JupyterlabApputils.Types.WidgetTracker.Create(!!createObj [ "namespace" ==> "blockly_r" ])
                             restorer.restore(tracker, !!createObj [ "command" ==> command; "name" ==> fun () -> "blockly_r" ]) |> ignore
+
+                            //Load app state (intellisense cache)
+                            let PLUGIN_ID = "jupyterlab_blockly_extension_r:intellisense-cache"
+                            app.restored.``then``(fun _ -> 
+                              state.fetch(PLUGIN_ID) //mismatch here with doc; we want the promise payload not another promise: https://github.com/jupyterlab/extension-examples/tree/master/state
+                                .``then``(fun value -> //console.log("Loaded intellisense cache " + !!value), fun _ -> console.log( "FAILED to load intellisense cache")
+                                  match value with
+                                  //TODO: check types on this                                
+                                  | Some(obj) -> 
+                                    console.log("Loaded intellisense cache with... ")
+                                    let keys = objectKeys(obj) 
+                                    for key in keys do
+                                      console.log(key);
+                                    // console.log(json) //
+                                    if keys.Length > 0 then
+                                      // RToolbox.intellisenseLookup <-  !!obj //
+                                      RToolbox.RestoreIntellisenseCacheFromStateDB(!!obj)
+                                    console.log("...done")
+                                  | None -> ()
+                                // )
+                            ) ) |> ignore  
+                            //Save intellisense variables to cache every few minutes
+                            let cacheTimer = new System.Timers.Timer(120000.0)
+                            cacheTimer.Elapsed.Add (fun _ -> 
+                              //createObj or Thoth with or without key seems to work, still trying to figure out persistence across boots
+                              state.save( PLUGIN_ID, RToolbox.IntellisenseCacheToJson() ) //createObj [ "fart" ==> RToolbox.IntellisenseCacheToJson()  ] )// RToolbox.intellisenseLookup ) 
+                                .``then``( fun _ -> console.log("Saved intellisense cache to stateDB"), fun _ -> console.log("FAILED to saved intellisense cache to stateDB")
+                                ) |> ignore 
+                              state.toJSON().``then``( fun db -> console.log("as " + !!db)) |> ignore //for debug
+                                ) 
+                              // Not sure we need to serialize first
+                              // state.save( PLUGIN_ID, RToolbox.IntellisenseCacheToJson() ) |> ignore )
+                            cacheTimer.AutoReset <- true
+                            cacheTimer.Enabled <- true
 
                             //wait until a notebook is displayed to hook kernel messages
                             notebooks.currentChanged.connect( onNotebookChanged, blocklyWidget ) |> ignore

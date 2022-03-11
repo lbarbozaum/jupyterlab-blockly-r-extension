@@ -653,6 +653,12 @@ blockly?R.["pipe_R"] <- fun (block : Blockly.Block) ->
 // Dictionary
 // list append, list range
 
+open Thoth.Json 
+
+//Fable 2 transition 
+let inline toJson x = Encode.Auto.toString(4, x)
+let inline ofJson<'T> json = Decode.Auto.unsafeFromString<'T>(json)
+
 /// An entry for a single name (var/function/whatever)
 type IntellisenseEntry =
   {
@@ -667,6 +673,43 @@ type IntellisenseVariable =
     VariableEntry : IntellisenseEntry
     ChildEntries : IntellisenseEntry[]
   }
+
+module IntellisenseEntry =
+
+    let encoder (i : IntellisenseEntry) =
+        Encode.object [
+            "Name", Encode.string i.Name
+            "Info", Encode.string i.Info
+            "isFunction", Encode.bool i.isFunction
+            "isClass", Encode.bool i.isClass
+        ]
+
+    let decoder : Decoder<IntellisenseEntry> =
+        Decode.object (fun get ->
+            {
+                Name = get.Required.Field "Name" Decode.string
+                Info = get.Required.Field "Info" Decode.string
+                isFunction = get.Required.Field "isFunction" Decode.bool
+                isClass = get.Required.Field "isClass" Decode.bool
+            }
+        )
+
+module IntellisenseVariable =
+
+    let encoder (i : IntellisenseVariable) =
+        Encode.object [
+            "VariableEntry", i.VariableEntry |> IntellisenseEntry.encoder
+            "ChildEntries", i.ChildEntries |> Array.map IntellisenseEntry.encoder |> Encode.array
+        ]
+
+    let decoder : Decoder<IntellisenseVariable> =
+        Decode.object (fun get ->
+            {
+                VariableEntry = get.Required.Field "VariableEntry" IntellisenseEntry.decoder
+                ChildEntries = get.Required.Field "ChildEntries" (Decode.array IntellisenseEntry.decoder) 
+            }
+        )
+
 
 /// Dependency injected from JupyterLab. Needed to send intellisense requests to the kernel
 let mutable ( notebooks : JupyterlabNotebook.Tokens.INotebookTracker ) = null
@@ -794,8 +837,34 @@ let GetKernalInspection( queryString : string ) =
     Promise.reject "no kernel"  //()
 
 /// Store results of resolved promises so that future synchronous calls can access. Keyed on variable name
-let intellisenseLookup = new System.Collections.Generic.Dictionary<string,IntellisenseVariable>()
-// V2 of the above with 2 stores: one that maps var names to docstrings, and one that maps docstrings to results of promise. Idea is that the docstring/result mapping is fairly static and will not change with var's type or renaming
+let mutable intellisenseLookup = new System.Collections.Generic.Dictionary<string,IntellisenseVariable>()
+
+/// Get object from Jupyter statedb and use to populate runtime intellisense cache
+/// Since the statedb can store a pojo, we store that to make storage as cheap as possible
+/// On load, we convert the pojo back to json to use the Thoth deserializer and get an F# object
+let RestoreIntellisenseCacheFromStateDB ( pojo : obj ) = 
+  let result = 
+    pojo
+    |> Encode.toString 0 //bounce the pojo through json so we can use Thoth to deserialize to F# object
+    |> Decode.fromString (Decode.keyValuePairs IntellisenseVariable.decoder) 
+    |> Result.map (fun namePersonList ->
+          namePersonList
+          |> dict
+          |> System.Collections.Generic.Dictionary)
+  match result with
+  | Ok(cache) -> intellisenseLookup <- cache
+  | Error(e) -> Browser.Dom.console.log("Failed to restore intellisense cache from json state. Specific error is " + e )
+
+/// Get json from runtime intellisense cache. 
+let IntellisenseCacheToJson() = 
+  intellisenseLookup
+  |> Seq.map( fun (KeyValue(k,v)) -> k, v |> IntellisenseVariable.encoder )
+  |> Map.ofSeq
+  |> Encode.dict
+  // |> Encode.toString 0 //we can leave this line off and just create a POJO that JupyterLab can store in statedb
+
+
+// V2 of the intellisenseLookup with 2 stores: one that maps var names to docstrings, and one that maps docstrings to results of promise. Idea is that the docstring/result mapping is fairly static and will not change with var's type or renaming
 //(NOTE: V2 MAY NOT BE FLAKEY, MAY HAVE FORGOTTEN TO CALL nltk.data.path.append("/y/nltk_data"))
 // let docIntellisenseMap = new System.Collections.Generic.Dictionary<string,IntellisenseVariable>()
 // let nameDocMap = new System.Collections.Generic.Dictionary<string,string>()
