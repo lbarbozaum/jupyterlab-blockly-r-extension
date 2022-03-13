@@ -49,7 +49,7 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             //listen for cell changes
             notebooks.activeCellChanged.connect( this.onActiveCellChanged, this ) |> ignore
 
-            //inject intellisense dependency into Blockly toolbox
+            //inject intellisense dependencies into Blockly toolbox
             RToolbox.notebooks <- notebooks 
 
             //div to hold blockly
@@ -251,6 +251,8 @@ type BlocklyWidget(notebooks: JupyterlabNotebook.Tokens.INotebookTracker) as thi
             this.workspace.removeChangeListener(logListener) |> ignore  //remove if already exists; for re-entrancy
             this.workspace.addChangeListener(logListener) |> ignore         
 
+            //Do final initialization of the toolbox
+            RToolbox.DoFinalInitialization( this.workspace :?> Blockly.WorkspaceSvg )
 
         /// Resize blockly when widget resizes
         override this.onResize( msg : PhosphorWidgets.Widget.ResizeMessage ) =

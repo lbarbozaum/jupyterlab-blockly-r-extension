@@ -711,7 +711,8 @@ module IntellisenseVariable =
         )
 
 
-/// Dependency injected from JupyterLab. Needed to send intellisense requests to the kernel
+/// Dependencies injected from JupyterLab. 
+/// Needed to send intellisense requests to the kernel
 let mutable ( notebooks : JupyterlabNotebook.Tokens.INotebookTracker ) = null
 
 let GetKernel() =
@@ -1455,6 +1456,50 @@ registry.Add(
 //update the registry
 blockly?Variables?flyoutRegistry <- registry
 
+// Defered initialization: final setup is done by the widget once it is ready
+let DoFinalInitialization( workspace : Blockly.WorkspaceSvg ) = 
+  /// SPECIAL category: blocks that only exist when a certain library is loaded, but which don't match intelliblocks well (e.g. %>% in R)
+  let specialFlyoutCallback_R =  System.Func<Blockly.Workspace,ResizeArray<Element>>(fun workspace  ->
+    let blockList = ResizeArray<Element>()
+    //add label explaining this category
+    // <label text="A label" ></label>
+    let label = Browser.Dom.document.createElement("label");
+    label.setAttribute("text", "Occassionally blocks appear here as you load libraries (e.g. %>%). See VARIABLES for most cases.");
+    blockList.Add(label)
+    //check the intellisense cache to see if functions have been loaded
+    if intellisenseLookup.ContainsKey("dplyr") then
+      let block = Browser.Dom.document.createElement("block");
+      block.setAttribute("type", "pipe_R");
+      blockList.Add(block)
+
+    blockList
+  )
+    
+  //register the callback
+  workspace.registerToolboxCategoryCallback("SPECIAL",specialFlyoutCallback_R)
+
+// let coloursFlyoutCallback = function(workspace) {
+//   // Returns an array of hex colours, e.g. ['#4286f4', '#ef0447']
+//   var colourList = getPalette();
+//   var blockList = [];
+//   for (var i = 0; i < colourList.length; i++) {
+//     var block = document.createElement('block');
+//     block.setAttribute('type', 'colour_picker');
+//     var field = document.createElement('field');
+//     field.setAttribute('name', 'COLOUR');
+//     field.innerText = colourList[i];
+//     block.appendChild(field);
+//     blockList.push(block);
+//   }
+//   return blockList;
+// };
+
+// Associates the function with the string 'COLOUR_PALLET'
+// myWorkspace.registerToolboxCategoryCallback(
+//     'COLOUR_PALETTE', coloursFlyoutCallback);
+
+//update the registry
+// blockly?Variables?flyoutRegistry <- registry
 
 // Override the dynamic 'Variables' toolbox category initialized in blockly_compressed.js
 // The basic idea here is that as we add vars, we extend the list of vars in the dropdowns in this category
@@ -1876,11 +1921,11 @@ let toolbox =
           </shadow>
         </value>
       </block>
-      <block type="pipe_R"></block>
     </category>
     <sep></sep>
     <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>
     <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category>
+    <category name="SPECIAL" colour="270" custom="SPECIAL"></category>
   </xml>"""
 
 
