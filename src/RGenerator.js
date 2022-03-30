@@ -13,7 +13,7 @@ Blockly.R = new Blockly.Generator('R');
 
 //AO: 20220221 importWithSideEffects does not work in deploy - the module is never loaded
 // adding a dummy export causes the module to load
-export const empty_string = "";
+export const side_effects_r_generator = "";
 
 /**
  * List of illegal variable names.
