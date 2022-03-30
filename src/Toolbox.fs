@@ -21,9 +21,10 @@ open JupyterlabServices.__kernel_messages.KernelMessage
 //This works in dev but fails in deploy; "RGenerator.js" is in deployed files but does not show in Chrome Sources Page view when deployed
 // importSideEffects("./RGenerator.js") 
 
-// A single member import invokes all side effects in dev; hopefully this will cause loading in deploy
-let empty_string : string = importMember "./RGenerator.js"
+// A single member import invokes all side effects in dev;
+let side_effects_r_generator : string = importMember "./RGenerator.js"
 
+let  CustomFields : obj = importMember "./SearchDropdown.js"
 
 //=================================================================
 
@@ -1084,6 +1085,9 @@ let SafeRemoveInput( block:Blockly.Block ) ( inputName : string )=
 // Dynamic argument mutator for intelliblocks
 createDynamicArgumentMutator "intelliblockMutator" 1 "add argument" "using" "and"
 
+// Search dropdown constructor
+[<Emit("new CustomFields.FieldFilter($0, $1, $2)")>] //CustomFields.FieldFilter('', options, this.validate);
+let createSearchDropdown( initialString : string, options : string[], validateFun : System.Func<string,obj> ): Blockly.Field = jsNative
 
 // TODO: MAKE BLOCK THAT ALLOWS USER TO MAKE AN ASSIGNMENT TO A PROPERTY (SETTER)
 // TODO: CHANGE OUTPUT CONNECTOR DEPENDING ON INTELLISENSE: IF FUNCTION DOESN'T HAVE AN OUTPUT, REMOVE CONNECTOR
@@ -1132,11 +1136,50 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
       let varUserName = thisBlockClosure?varSelectionUserName(thisBlockClosure,selectedVarOption)
       let options = varUserName |> optionsFunction 
 
+      // --------------------------------------------------------------------
+      // // Pre-search approach: newMemberSelection is text, e.g. "read.csv"
+      // //use intellisense to populate the member options, also use validator so that when we select a new member from the dropdown, tooltip is updated
+      // input.appendField( !^(blockly.FieldDropdown.Create( options, System.Func<string,obj>( fun newMemberSelection ->
+      //   // Within validator, "this" refers to FieldVariable not block.
+      //   let (thisFieldDropdown : Blockly.FieldDropdown) = !!thisObj
+      //   thisFieldDropdown.setTooltip( !^( getIntellisenseMemberTooltip varUserName newMemberSelection ) )
+      //   //back up the current member selection so it is not lost every time a cell is run; ignore status selections that start with !
+      //   thisBlockClosure?selectedMember <- 
+      //     match newMemberSelection.StartsWith("!"),thisBlock?selectedMember with
+      //     | _, "" -> newMemberSelection 
+      //     | true, _ -> thisBlock?selectedMember
+      //     | false,_ -> newMemberSelection
+
+      //   //back up to XML data if valid
+      //   if varUserName <> "" then
+      //     thisBlockClosure?data <- varUserName + ":" + thisBlockClosure?selectedMember //only set data when at least var name is known
+
+      //   //Since we are leveraging the validator, we return the selected value without modification
+      //   newMemberSelection |> unbox)
+      // ) :> Blockly.Field), "MEMBER"  ) |> ignore 
+
+      // ---------------------------------------------------------------------------
+      // Search approach : newMemberSelection is number/index into list of options
+      // ---------------------------------------------------------------------------
+      // Remove extra data from options
+      let flatOptions = options |> Array.map( fun arr -> arr.[0])
       //use intellisense to populate the member options, also use validator so that when we select a new member from the dropdown, tooltip is updated
-      input.appendField( !^(blockly.FieldDropdown.Create( options, System.Func<string,obj>( fun newMemberSelection ->
+      // Restore stored value from XML if it exists
+      let defaultSelection = 
+        let dataString = (thisBlockClosure?data |> string)
+        if dataString.Contains(":") then dataString.Split(':').[1] else ""
+
+      input.appendField( !^createSearchDropdown(defaultSelection, flatOptions,System.Func<string,obj>( fun newMemberSelectionIndex ->
         // Within validator, "this" refers to FieldVariable not block.
-        let (thisFieldDropdown : Blockly.FieldDropdown) = !!thisObj
-        thisFieldDropdown.setTooltip( !^( getIntellisenseMemberTooltip varUserName newMemberSelection ) )
+        let (thisSearchDropdown : Blockly.FieldTextInput) = !!thisObj
+        // NOTE: newMemberSelectionIndex is an index into WORDS not INITWORDS
+        // this is weird: the type of newMemberSelectionIndex seems to switch from string to int...
+        let newMemberSelection = 
+          if newMemberSelectionIndex = "" then 
+            defaultSelection
+          else
+            unbox<string[]>(thisSearchDropdown?WORDS).[!!newMemberSelectionIndex] 
+        thisSearchDropdown.setTooltip( !^( getIntellisenseMemberTooltip varUserName newMemberSelection ) )
         //back up the current member selection so it is not lost every time a cell is run; ignore status selections that start with !
         thisBlockClosure?selectedMember <- 
           match newMemberSelection.StartsWith("!"),thisBlock?selectedMember with
@@ -1150,7 +1193,8 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
 
         //Since we are leveraging the validator, we return the selected value without modification
         newMemberSelection |> unbox)
-      ) :> Blockly.Field), "MEMBER"  ) |> ignore 
+      ), "MEMBER"  ) |> ignore 
+      // end search approach
 
       //back up to XML data if valide; when the deserialized XML contains data, we should never overwrite it here
       if thisBlockClosure?data = null then
@@ -1237,6 +1281,7 @@ let makeMemberIntellisenseBlock_R (blockName:string) (preposition:string) (verb:
         let varName = thisBlock?varSelectionUserName(thisBlock, None) //Blockly is pretty good at recovering the variable, so we don't need to get from data
         thisBlock.setTooltip !^( varName |> getIntellisenseVarTooltip )
 
+        //3/21/22: TRY THIS NEXT https://groups.google.com/g/blockly/c/C8yx3aVsHbU/m/MeoN1SEnAgAJ
         //TODO NOT SOLVING PROBLEM
         //force a block rerender (blocks sometimes "click" but are offset from what they are supposed to be connected to)
         // if thisBlock.outputConnection.targetBlock() <> null then
