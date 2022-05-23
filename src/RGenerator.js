@@ -2,7 +2,10 @@
 // using additional examples from lua.js
 // and inlining relevant modified blocks from blockly-3.20191014.4/generators/javascript
 import Blockly from 'blockly';
-import '@blockly/block-plus-minus'; //AO: 20220223 trying plus/minus for UI improvement generally but %>% improvement specifically
+
+//AO: 20220223 trying plus/minus for UI improvement generally but %>% improvement specifically
+//NOTE had to modify procedures.js line 342 targId = argId || Blockly.utils~~.idGenerator~~.genUid();
+import '@blockly/block-plus-minus'; 
 
 
 /**

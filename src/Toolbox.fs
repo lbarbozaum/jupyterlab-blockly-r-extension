@@ -493,6 +493,9 @@ blockly?R.["uniqueBlock_R"] <- fun (block : Blockly.Block) ->
 let createPlusField( o: obj): Blockly.FieldImage = jsNative
 [<ImportMember("./field_minus.js")>]
 let createMinusField( o: obj): Blockly.FieldImage = jsNative
+// bugfix so need own copy
+[<ImportMember("./procedures.js")>]
+let getDefNoReturn : obj = jsNative
 
 /// A mutator for dynamic arguments. A block using this mutator must have a dummy called "EMPTY" and must register this mutator
 let createDynamicArgumentMutator ( mutatorName : string) (startCount : int) (emptyLeadSlotLabel:string) (nonEmptyLeadSlotLabel:string) (additionalSlotLabel : string)= 
