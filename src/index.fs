@@ -524,7 +524,7 @@ let extension =
                             //If query string has bl=1, trigger the open command once the application is ready
                             let searchParams = Browser.Url.URLSearchParams.Create(  Browser.Dom.window.location.search )
                             match searchParams.get("bl") with
-                            | Some(state) when state = "1" ->
+                            | Some(state) when state = "r" ->
                               console.log ("jupyterlab_blockly_extension_r: triggering open command based on query string input")
                               app.restored.``then``(fun _ -> 
                                 //wait until a notebook is displayed so we dock correctly (e.g. nbgitpuller deployment)

@@ -567,6 +567,8 @@ let createDynamicArgumentMutator ( mutatorName : string) (startCount : int) (emp
 [<Emit("Object.assign({}, $0)")>]
 let clone (x: obj) : obj = jsNative
 
+//TODO: REFACTOR PIPE AND GGPLOT WHEN HAND USABLE
+// pipe ------------------------------------------------------------
 /// deep clone list as a base, then modify init and updateShape
 blockly?Blocks.["pipe_R"] <- clone( blockly?Blocks.["lists_create_with"] )
 
@@ -580,14 +582,6 @@ if blockly?Extensions?ALL_?new_list_create_with_mutator = null then
         thisBlock?itemCount_ <- 1;
         thisBlock?updateShape_()
         thisBlock.setOutput(true) //U3.Case1("Array"))
-
-        // //check if we are using the plus/minus extension; if so, use that mutator
-        // let mutatorName = 
-        //   // the plus/minus extension will have registered this mutator
-        //   if blockly?Extensions?ALL_?new_list_create_with_mutator <> null then
-        //     "new_list_create_with_mutator"
-        //   else
-        //     "lists_create_with_item"
         
         thisBlock.setMutator( blockly.Mutator.Create( [|"lists_create_with_item"|] ) )
         thisBlock.setColour !^230.0
@@ -646,7 +640,77 @@ blockly?R.["pipe_R"] <- fun (block : Blockly.Block) ->
   let code = input + " %>%\n    " + (String.concat " %>%\n    " elements)
   [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
+// ggplot plus  ------------------------------------------------------------
+/// deep clone list as a base, then modify init and updateShape
+blockly?Blocks.["ggplot_plus_R"] <- clone( blockly?Blocks.["lists_create_with"] )
 
+//check if we are using the plus/minus extension; if not, use non-mixin approach
+if blockly?Extensions?ALL_?new_list_create_with_mutator = null then
+  blockly?Blocks.["ggplot_plus_R"]?init <- fun () -> 
+        // Browser.Dom.console.log( "ggplot_plus_R" + " init")
+        let input = thisBlock.appendValueInput("INPUT") //else thisBlock.appendDummyInput("INPUT")
+        input.appendField(!^"make plot") |> ignore
+        // thisBlock.setInputsInline(true)
+        thisBlock?itemCount_ <- 1;
+        thisBlock?updateShape_()
+        thisBlock.setOutput(true) //U3.Case1("Array"))
+        
+        thisBlock.setMutator( blockly.Mutator.Create( [|"lists_create_with_item"|] ) )
+        thisBlock.setColour !^230.0
+        thisBlock.setTooltip !^"A ggplot"
+        thisBlock.setHelpUrl !^""
+  blockly?Blocks.["ggplot_plus_R"]?updateShape_ <- fun () -> 
+        //remove empty label if list nonempty
+        if thisBlock?itemCount_ > 0 && thisBlock.getInput("EMPTY") <> null then
+          thisBlock.removeInput("EMPTY")
+        //add empty label if list empty
+        elif thisBlock?itemCount_ = 0 && thisBlock.getInput("EMPTY") = null then
+          thisBlock.appendDummyInput("EMPTY")
+            .appendField(U2.Case1("add plot element")) |> ignore
+
+        //add inputs for each item in list
+        let mutable index = 0
+        for i = 0 to thisBlock?itemCount_ - 1 do 
+          index <- i
+          if thisBlock.getInput("ADD" + string(i)) = null then
+            thisBlock.appendValueInput("ADD" + string(i))
+              .appendField(U2.Case1("with"))
+              .setAlign(blockly.ALIGN_RIGHT) |> ignore
+        index <- index + 1
+
+        //remove deleted inputs
+        while thisBlock.getInput("ADD" + string(index)) <> null do
+          thisBlock.removeInput("ADD" + string(index))
+          index <- index + 1
+else
+  //NEW APPROACH - uses the plus/minus based mutator
+  //Use a mixin-compatible init
+  createDynamicArgumentMutator "plusMutator" 1 "add plot element" "with" "and with"
+  blockly?Blocks.["ggplot_plus_R"]?init <- fun () -> 
+      // Browser.Dom.console.log( "ggplot_plus_R" + " init")
+      let input = thisBlock.appendValueInput("INPUT") 
+      input.appendField(!^"make plot") |> ignore
+      let empty = thisBlock.appendDummyInput("EMPTY")
+
+      thisBlock.setOutput(true) //U3.Case1("Array"))
+      blockly?Extensions?apply("plusMutator",thisBlock,true)
+
+      thisBlock.setColour !^230.0
+      thisBlock.setTooltip !^"A ggplot"
+      thisBlock.setHelpUrl !^""
+
+
+
+/// Generate R template conversion code
+blockly?R.["ggplot_plus_R"] <- fun (block : Blockly.Block) -> 
+  let elements : string[] = 
+    [|
+      for i = 0 to block?itemCount_ - 1 do
+        yield  blockly?R?valueToCode(block, "ADD" + string(i), blockly?R?ORDER_COMMA)
+    |]
+  let input =  blockly?R?valueToCode(block, "INPUT", blockly?R?ORDER_MEMBER)
+  let code = input + " +\n    " + (String.concat " +\n    " elements)
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
 
 //TODO: 
 // ? OPTION FOR BOTH POSITION ONLY (PASS IN LIST OF ARGS) AND KEYWORD ARGUMENTS (PASS IN DICTIONARY)
@@ -1515,6 +1579,10 @@ let DoFinalInitialization( workspace : Blockly.WorkspaceSvg ) =
     if intellisenseLookup.ContainsKey("dplyr") then
       let block = Browser.Dom.document.createElement("block");
       block.setAttribute("type", "pipe_R");
+      blockList.Add(block)
+    if intellisenseLookup.ContainsKey("ggplot2") then
+      let block = Browser.Dom.document.createElement("block");
+      block.setAttribute("type", "ggplot_plus_R");
       blockList.Add(block)
 
     blockList
