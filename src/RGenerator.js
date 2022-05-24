@@ -4,7 +4,7 @@
 import Blockly from 'blockly';
 
 //AO: 20220223 trying plus/minus for UI improvement generally but %>% improvement specifically
-//NOTE had to modify procedures.js line 342 targId = argId || Blockly.utils~~.idGenerator~~.genUid();
+//NOTE 5/24/22: down graded plus/minus from 3.0.6 to 2.0.39 because genUid must be at Blockly.utils.genUid() for our Blocky version
 import '@blockly/block-plus-minus'; 
 
 
