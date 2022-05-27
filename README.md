@@ -6,7 +6,7 @@ This is the twin of [jupyterlab-blockly-python-extension](https://github.com/aol
 
 The following query string parameters enable functionality:
 
-- `bl=1` forces the extension to display on load (it is already active)
+- `bl=r` forces the extension to display on load (it is already active)
 - `log=xxx` specifies a url for a logging endpoint (e.g. https://yourdomain.com/log)
 - `id=xxx` adds an identifier for logging
 
