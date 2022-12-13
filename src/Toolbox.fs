@@ -468,6 +468,25 @@ makeFunctionBlock_R
 //   let code = "(" +  firstArg + "," + secondArg + ")" 
 //   [| code; blockly?R?ORDER_NONE |]
 
+//Convert a list to a vector
+blockly?Blocks.["unlistBlock_R"] <- createObj [
+  "init" ==> fun () ->
+    thisBlock.appendValueInput("LIST")
+        .setCheck(!^"Array")
+        .appendField(!^"vector") |> ignore
+    thisBlock.setInputsInline(true);
+    thisBlock.setOutput(true, !^"Array");
+    thisBlock.setColour(!^230.0);
+    thisBlock.setTooltip(!^"Use this to convert a list to a vector");
+    thisBlock.setHelpUrl(!^"https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/unlist");
+]
+
+/// Generate R for convert list to vector
+blockly?R.["unlistBlock_R"] <- fun (block : Blockly.Block) -> 
+  let (args : string) = blockly?R?valueToCode(block, "LIST", blockly?R?ORDER_MEMBER) 
+  let code = "unlist(" + args + ", use.names = FALSE)" 
+  [| code; blockly?R?ORDER_FUNCTION_CALL |]
+
 // Unique elements of a list, conceptually replaces set for Python 
 blockly?Blocks.["uniqueBlock_R"] <- createObj [
   "init" ==> fun () ->
@@ -1973,6 +1992,7 @@ let toolbox =
       <block type="lists_sort"></block>
       <block type="uniqueBlock_R"></block>
       <block type="reversedBlock_R"></block>
+      <block type="unlistBlock_R"></block>
     </category>
     <category name="COLOUR" colour="%{BKY_COLOUR_HUE}">
       <block type="colour_picker"></block>
