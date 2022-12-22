@@ -998,7 +998,8 @@ let RequestIntellisenseVariable_R(block : Blockly.Block) ( parentName : string )
       // V3 only update completions if cached parent type has changed or has no children OR if there is nothing in the cache.
       let shouldGetChildren =
         match intellisenseLookup.TryGetValue(parent.Name) with
-        | true, cached -> if cached.VariableEntry.Info <> parent.Info || cached.ChildEntries.Length = 0 then true else false
+        // 12/22/22:  if no children, ChildEntries.Length = 1 and the child is "UNDEFINED"
+        | true, cached -> if cached.VariableEntry.Info <> parent.Info || cached.ChildEntries.Length <= 1 then true else false
         | false, _ -> true
           
       // Use $ and :: for completions and otherwise adjust Python specific concepts to R
