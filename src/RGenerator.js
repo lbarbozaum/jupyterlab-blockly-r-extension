@@ -5,6 +5,9 @@ import Blockly from 'blockly';
 
 //AO: 20220223 trying plus/minus for UI improvement generally but %>% improvement specifically
 //NOTE 5/24/22: down graded plus/minus from 3.0.6 to 2.0.39 because genUid must be at Blockly.utils.genUid() for our Blocky version
+//NOTE 12/22/22: For unclear reasons, plus/minus causes code generation to fail BUT ONLY FOR R, NOT PYTHON
+//Presumably this is some sort of namespace/scoping issue, but in the short term, the best option appears to be disabling procedures in R,
+//because plus/minus is otherwise so good that it's not worth ditching it just to get procedures back
 import '@blockly/block-plus-minus'; 
 
 

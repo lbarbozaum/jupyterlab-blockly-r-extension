@@ -1126,7 +1126,11 @@ let requestAndStubOptions_R (block : Blockly.Block) ( varName : string ) =
 
 let getIntellisenseMemberOptions(memberSelectionFunction : IntellisenseEntry -> bool) ( varName : string ) =
   match  varName |> intellisenseLookup.TryGetValue with
-  | true, iv when not(iv.VariableEntry.isFunction) && iv.ChildEntries.Length > 0  -> 
+  //12/22/22: having a problem with the `tune` package which contains function `tune`, so no children of package tune are being listed.
+  //Trying to solve by removing the not is function restriction
+  //We could possibly tweak intellisense for R by using help(package="tune") to query
+  // | true, iv when not(iv.VariableEntry.isFunction) && iv.ChildEntries.Length > 0  -> 
+  | true, iv when iv.ChildEntries.Length > 0  -> 
       //NOTE: for dropdowns, blockly returns the label, e.g. "VAR", not the value displayed to the user. Making them identical allows us to get the value displayed to user
       iv.ChildEntries |> Array.filter memberSelectionFunction |> Array.map( fun ie -> [| ie.Name; ie.Name |] )
   | false, _ ->  [| [| "!Not defined until you execute code."; "!Not defined until you execute code." |] |]
@@ -2061,7 +2065,7 @@ let toolbox =
     </category>
     <sep></sep>
     <category name="VARIABLES" colour="%{BKY_VARIABLES_HUE}" custom="VARIABLE"></category>
-    <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category>
+    <!-- TEMPORARILY DISABLED B/C OF PLUS/MINUS INCOMPATIBILITY <category name="FUNCTIONS" colour="%{BKY_PROCEDURES_HUE}" custom="PROCEDURE"></category> -->
     <category name="SPECIAL" colour="270" custom="SPECIAL"></category>
   </xml>"""
 
