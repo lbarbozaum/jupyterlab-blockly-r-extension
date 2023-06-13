@@ -14,3 +14,6 @@ tests/obj/
 .fake
 blockly-3.20191014.4/
 block-plus-minus-3.0.6/
+*.csv
+*workspace.json
+.editorconfig

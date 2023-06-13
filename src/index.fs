@@ -542,8 +542,9 @@ let extension =
 
                             //If query string has log=xxx, use this at the logging endpoint
                             //must include http/https in url
-                            match searchParams.get("log") with
-                            | Some(logUrl) -> Logging.logUrl <- Some(logUrl)
+                            //To avoid double loggging of the Python extension, also require flag "logr=1"
+                            match searchParams.get("log"),searchParams.get("logr") with
+                            | Some(logUrl),Some("1") -> Logging.logUrl <- Some(logUrl)
                             | _ -> ()
 
                           ) //Func
